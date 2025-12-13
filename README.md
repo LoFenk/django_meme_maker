@@ -1,15 +1,27 @@
 # Django Meme Maker
 
-A reusable Django app for creating and managing memes with customizable, embeddable templates. Perfect for adding meme creation functionality to any Django project.
+A reusable Django app for creating and managing memes with a searchable template bank and customizable, embeddable templates. Perfect for adding meme creation functionality to any Django project.
 
 ## Features
 
-- 📸 **Easy meme creation** - Upload images and add top/bottom text
-- 🎨 **Customizable themes** - Configure colors, styles, and layouts
-- 📦 **Embeddable components** - Include meme functionality in any template
+- 🔍 **Template Bank** - Searchable library of meme templates by title and tags
+- ✨ **Meme Editor** - Create memes from templates with customizable text overlays
+- 🎨 **Text Styling** - Configure colors, font size, and positioning
+- 📥 **Download Support** - Download both templates and generated memes
+- 🖼️ **Image Generation** - Automatic composite image generation with Pillow
 - 💾 **Storage agnostic** - Works with any Django storage backend (local, S3, GCS, etc.)
+- 📦 **Embeddable components** - Include meme functionality in any template
 - 🔌 **Plug and play** - Simple installation with sensible defaults
 - 📱 **Responsive design** - Works great on all screen sizes
+
+## User Workflow
+
+1. **Browse Templates** - Search the template bank by name or tags
+2. **Select Template** - View template details and click "Make My Own"
+3. **Edit Meme** - Add top/bottom text with custom styling
+4. **Save & Share** - Download the generated meme or share via URL
+
+If no template exists, users can **upload their own** and immediately create a meme from it.
 
 ## Installation
 
@@ -81,7 +93,7 @@ python manage.py migrate
 
 ### 5. Done!
 
-Visit `/memes/` to start creating memes!
+Visit `/memes/` to start browsing templates and creating memes!
 
 ## Configuration
 
@@ -119,11 +131,111 @@ MEME_MAKER = {
 }
 ```
 
+## URLs Reference
+
+| URL Pattern | Name | Description |
+|-------------|------|-------------|
+| `/` | `meme_maker:home` | Redirects to template list |
+| `/templates/` | `meme_maker:template_list` | Search and browse templates |
+| `/templates/<pk>/` | `meme_maker:template_detail` | View template details |
+| `/templates/upload/` | `meme_maker:template_upload` | Upload new template |
+| `/templates/<pk>/download/` | `meme_maker:template_download` | Download template image |
+| `/editor/<template_pk>/` | `meme_maker:meme_editor` | Create meme from template |
+| `/meme/<pk>/` | `meme_maker:meme_detail` | View a meme |
+| `/meme/<pk>/download/` | `meme_maker:meme_download` | Download meme image |
+| `/memes/` | `meme_maker:meme_list` | List all memes |
+| `/create/` | `meme_maker:create` | Legacy: direct meme creation |
+
+## Data Models
+
+### MemeTemplate
+
+Stores reusable meme template images with searchable metadata.
+
+```python
+from meme_maker import MemeTemplate
+
+# Create a template
+template = MemeTemplate.objects.create(
+    image=uploaded_file,
+    title='Distracted Boyfriend',
+    tags='funny, reaction, relationship'
+)
+
+# Search templates
+results = MemeTemplate.search('funny')
+
+# Get tags as list
+tags = template.get_tags_list()  # ['funny', 'reaction', 'relationship']
+```
+
+### Meme
+
+Stores user-created memes with text overlays and generated composite images.
+
+```python
+from meme_maker import Meme
+
+# Create from template
+meme = Meme(template=template)
+meme.set_overlays([
+    {
+        'text': 'When you see a bug',
+        'position': 'top',
+        'color': '#FFFFFF',
+        'stroke_color': '#000000',
+    },
+    {
+        'text': 'In production',
+        'position': 'bottom',
+        'color': '#FFFFFF', 
+        'stroke_color': '#000000',
+    }
+])
+meme.save()  # Automatically generates composite image
+
+# Get display URL (prefers generated image)
+url = meme.get_display_image_url()
+```
+
+#### Text Overlay JSON Schema
+
+```json
+{
+    "overlays": [
+        {
+            "text": "Hello World",
+            "position": "top",
+            "x": 50,
+            "y": 10,
+            "font_size": 48,
+            "color": "#FFFFFF",
+            "stroke_color": "#000000",
+            "stroke_width": 2,
+            "uppercase": true
+        }
+    ]
+}
+```
+
+## Image Generation Strategy
+
+The app uses a **hybrid approach** for optimal performance and flexibility:
+
+1. **Text Overlays as JSON** - Stored in `Meme.text_overlays` for future editing
+2. **Pre-generated Composite Image** - Stored in `Meme.generated_image` for fast downloads
+
+When a meme is saved:
+- Pillow renders the text onto the template image
+- The composite is saved to storage
+- Downloads serve the pre-rendered image (fast)
+- If Pillow fails, CSS-based overlay is used as fallback
+
 ## Integration Options
 
 ### Option 1: Standalone Pages (Default)
 
-The meme maker works out of the box with its own base template. Just include the URLs:
+The meme maker works out of the box with its own base template:
 
 ```python
 urlpatterns = [
@@ -138,206 +250,59 @@ To make the meme maker inherit your site's base template:
 ```python
 # settings.py
 MEME_MAKER = {
-    'BASE_TEMPLATE': 'your_app/base.html',  # Your site's base template
-    'EMBED_MODE': True,  # Don't render the outer page wrapper
+    'BASE_TEMPLATE': 'your_app/base.html',
+    'EMBED_MODE': True,
 }
-```
-
-Your base template should have a content block:
-
-```html
-<!-- your_app/base.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{% block title %}My Site{% endblock %}</title>
-    {% block extra_head %}{% endblock %}
-</head>
-<body>
-    <nav><!-- Your navigation --></nav>
-    
-    <main>
-        {% block content %}{% endblock %}
-        <!-- Or use: {% block meme_maker_content %}{% endblock %} -->
-    </main>
-    
-    <footer><!-- Your footer --></footer>
-    
-    {% block extra_js %}{% endblock %}
-</body>
-</html>
 ```
 
 ### Option 3: Include Components in Your Templates
 
-You can include meme maker components directly in your own templates:
-
 ```html
 {% load meme_maker_tags %}
 
-<!-- Include the styles -->
 {% meme_maker_css %}
 
-<!-- Display a single meme -->
+<!-- Get recent templates -->
+{% get_recent_templates 6 as templates %}
+
+<!-- Render meme components -->
 {% render_meme meme %}
-
-<!-- Display a meme with info and actions -->
-{% render_meme meme show_info=True show_actions=True %}
-
-<!-- Display a grid of memes -->
-{% render_meme_grid memes %}
-
-<!-- Display a meme card -->
 {% render_meme_card meme %}
-
-<!-- Get recent memes -->
-{% get_recent_memes 6 as recent_memes %}
-{% for meme in recent_memes %}
-    {% render_meme_card meme %}
-{% endfor %}
+{% render_meme_grid memes %}
 ```
 
-### Option 4: Include Component Templates Directly
+## Forms Reference
 
-```html
-<!-- Include the styles in your head -->
-{% include "meme_maker/components/styles.html" %}
+### MemeTemplateForm
 
-<!-- Include the meme form -->
-{% include "meme_maker/components/meme_form.html" with form=form %}
-
-<!-- Include a meme display -->
-{% include "meme_maker/components/meme_display.html" with meme=meme show_info=True %}
-
-<!-- Include a meme grid -->
-{% include "meme_maker/components/meme_grid.html" with memes=memes %}
-```
-
-## Context Processor (Optional)
-
-To have meme maker settings available in all templates:
+For uploading new templates:
 
 ```python
-# settings.py
-TEMPLATES = [
-    {
-        # ...
-        'OPTIONS': {
-            'context_processors': [
-                # ... other processors
-                'meme_maker.context_processors.meme_maker_context',
-            ],
-        },
-    },
-]
+from meme_maker import MemeTemplateForm
+
+form = MemeTemplateForm(request.POST, request.FILES)
+if form.is_valid():
+    template = form.save()
 ```
 
-Then in templates:
+### MemeEditorForm
 
-```html
-{{ meme_maker_primary_color }}
-{{ meme_maker_title }}
-```
-
-## Custom Styling
-
-### Using CSS Variables
-
-The meme maker uses CSS custom properties that you can override:
-
-```css
-:root {
-    --meme-primary: #your-color;
-    --meme-secondary: #your-color;
-    --meme-gradient: linear-gradient(135deg, var(--meme-primary) 0%, var(--meme-secondary) 100%);
-    --meme-text-dark: #1a1a2e;
-    --meme-text-light: #6b7280;
-    --meme-bg-light: #f8fafc;
-    --meme-bg-white: #ffffff;
-    --meme-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-    --meme-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --meme-radius: 16px;
-    --meme-radius-sm: 10px;
-}
-```
-
-### Using the CUSTOM_CSS Setting
+For creating memes with text overlays:
 
 ```python
-MEME_MAKER = {
-    'CUSTOM_CSS': '''
-        .meme-btn {
-            background: #ff6b6b !important;
-        }
-        .meme-card {
-            border: 2px solid #ddd;
-        }
-    ''',
-}
+from meme_maker import MemeEditorForm
+
+form = MemeEditorForm(request.POST)
+if form.is_valid():
+    overlays = form.get_overlays()
+    meme = Meme(template=template)
+    meme.set_overlays(overlays)
+    meme.save()
 ```
 
-### Overriding Templates
+### MemeForm (Legacy)
 
-Create your own templates in `your_app/templates/meme_maker/` to override the defaults:
-
-```
-your_app/
-  templates/
-    meme_maker/
-      base.html      # Override the base template
-      create.html    # Override the create page
-      detail.html    # Override the detail page
-      list.html      # Override the list page
-```
-
-## Storage Configuration
-
-The meme maker automatically uses Django's default storage backend. To use custom storage (like S3):
-
-```python
-# settings.py
-
-# For Django 4.2+
-STORAGES = {
-    "default": {
-        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
-
-# AWS settings
-AWS_ACCESS_KEY_ID = 'your-key'
-AWS_SECRET_ACCESS_KEY = 'your-secret'
-AWS_STORAGE_BUCKET_NAME = 'your-bucket'
-```
-
-## API Reference
-
-### Models
-
-#### `Meme`
-
-```python
-from meme_maker import Meme
-
-# Create a meme
-meme = Meme.objects.create(
-    image=uploaded_file,
-    top_text='Hello',
-    bottom_text='World'
-)
-
-# Access properties
-meme.image.url  # URL of the image
-meme.get_absolute_url()  # URL to the detail page
-meme.created_at  # Creation timestamp
-```
-
-### Forms
-
-#### `MemeForm`
+For direct meme creation without templates:
 
 ```python
 from meme_maker import MemeForm
@@ -347,60 +312,94 @@ if form.is_valid():
     meme = form.save()
 ```
 
-#### `MemeEditForm`
-
-```python
-from meme_maker import MemeEditForm
-
-form = MemeEditForm(request.POST, request.FILES, instance=meme)
-```
-
-### Settings
-
-```python
-from meme_maker import meme_maker_settings
-
-# Access settings
-meme_maker_settings.PRIMARY_COLOR
-meme_maker_settings.UPLOAD_PATH
-meme_maker_settings.get_context()  # Get all settings as a dict
-```
-
-### Template Tags
-
-```html
-{% load meme_maker_tags %}
-
-{% meme_maker_css %}                           {# Include CSS styles #}
-{% get_meme_maker_settings as settings %}      {# Get settings dict #}
-{% render_meme meme %}                         {# Render a meme #}
-{% render_meme_card meme %}                    {# Render a meme card #}
-{% render_meme_grid memes %}                   {# Render a meme grid #}
-{% get_recent_memes 6 as recent %}             {# Get recent memes #}
-```
-
-## URLs
-
-| URL Pattern | Name | Description |
-|-------------|------|-------------|
-| `/` | `meme_maker:home` | Redirects to create page |
-| `/create/` | `meme_maker:create` | Create a new meme |
-| `/meme/<id>/` | `meme_maker:detail` | View a single meme |
-| `/memes/` | `meme_maker:list` | List all memes |
-
 ## Class-Based Views
 
 For more flexibility, use the class-based views:
 
 ```python
-from meme_maker.views import MemeCreateView, MemeDetailView, MemeListView
+from meme_maker.views import (
+    MemeTemplateListView,
+    MemeTemplateDetailView,
+    MemeTemplateCreateView,
+    MemeCreateView,
+    MemeDetailView,
+    MemeListView,
+)
 
 urlpatterns = [
+    path('templates/', MemeTemplateListView.as_view(), name='templates'),
+    path('templates/<int:pk>/', MemeTemplateDetailView.as_view(), name='template_detail'),
     path('create/', MemeCreateView.as_view(), name='create'),
     path('meme/<int:pk>/', MemeDetailView.as_view(), name='detail'),
     path('list/', MemeListView.as_view(), name='list'),
 ]
 ```
+
+## Search Behavior
+
+Template search works on:
+- **Title** (case-insensitive contains)
+- **Tags** (case-insensitive contains)
+
+Uses `icontains` for database-agnostic compatibility (SQLite, PostgreSQL, MySQL).
+
+```python
+# Search via model method
+templates = MemeTemplate.search('funny cat')
+
+# Search via view (GET parameter)
+# /memes/templates/?q=funny+cat
+```
+
+## Storage Configuration
+
+The meme maker automatically uses Django's default storage backend:
+
+```python
+# settings.py - For S3 storage
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+AWS_ACCESS_KEY_ID = 'your-key'
+AWS_SECRET_ACCESS_KEY = 'your-secret'
+AWS_STORAGE_BUCKET_NAME = 'your-bucket'
+```
+
+## Custom Styling
+
+### Using CSS Variables
+
+```css
+:root {
+    --meme-primary: #your-color;
+    --meme-secondary: #your-color;
+    --meme-gradient: linear-gradient(135deg, var(--meme-primary) 0%, var(--meme-secondary) 100%);
+}
+```
+
+### Using CUSTOM_CSS Setting
+
+```python
+MEME_MAKER = {
+    'CUSTOM_CSS': '''
+        .meme-btn { background: #ff6b6b !important; }
+        .meme-card { border: 2px solid #ddd; }
+    ''',
+}
+```
+
+## Admin Interface
+
+Both models are registered with the Django admin:
+
+- **MemeTemplate Admin**: Preview, search by title/tags, view meme count
+- **Meme Admin**: Preview, template info, regenerate images action
 
 ## Development
 
@@ -424,6 +423,13 @@ twine upload dist/*
 - Python 3.10+
 - Django 4.2+
 - Pillow 9.0+
+
+## Backward Compatibility
+
+Existing memes created before the template bank update will continue to work:
+- Direct image uploads are still supported
+- Legacy `top_text` and `bottom_text` fields are preserved
+- Old URL patterns (`/create/`, `/detail/<pk>/`) still work
 
 ## License
 

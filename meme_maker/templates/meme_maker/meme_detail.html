@@ -1,0 +1,80 @@
+{% extends meme_maker_base_template|default:"meme_maker/base.html" %}
+
+{% block header_title %}Your Meme{% endblock %}
+{% block header_subtitle %}Meme #{{ meme.pk }}{% endblock %}
+
+{% block meme_maker_content %}
+<div class="meme-display">
+    <div class="meme-display-wrapper">
+        {# If we have a generated image, show that #}
+        {% if meme.generated_image %}
+        <img src="{{ meme.generated_image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
+        {% else %}
+        {# Otherwise show source with CSS overlay #}
+        <img src="{{ meme.get_source_image_url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
+        {% for overlay in meme.get_overlay_for_css %}
+        <div class="meme-text-overlay meme-text-{{ overlay.position }}" style="{{ overlay.style }}{% if overlay.color %}color: {{ overlay.color }};{% endif %}">
+            {{ overlay.text }}
+        </div>
+        {% empty %}
+        {# Legacy fallback #}
+        {% if meme.top_text %}
+        <div class="meme-text-overlay meme-text-top">{{ meme.top_text }}</div>
+        {% endif %}
+        {% if meme.bottom_text %}
+        <div class="meme-text-overlay meme-text-bottom">{{ meme.bottom_text }}</div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="meme-info">
+    <p class="meme-info-text">
+        <strong>Created:</strong> {{ meme.created_at|date:"F d, Y g:i A" }}
+    </p>
+    
+    {% if meme.template %}
+    <p class="meme-info-text">
+        <strong>Template:</strong> 
+        <a href="{% url 'meme_maker:template_detail' meme.template.pk %}" style="color: var(--meme-primary);">
+            {{ meme.template.title }}
+        </a>
+    </p>
+    {% endif %}
+    
+    {% if meme.top_text %}
+    <p class="meme-info-text"><strong>Top text:</strong> {{ meme.top_text }}</p>
+    {% endif %}
+    {% if meme.bottom_text %}
+    <p class="meme-info-text"><strong>Bottom text:</strong> {{ meme.bottom_text }}</p>
+    {% endif %}
+    
+    <div class="meme-btn-group" style="margin-top: 1.5rem;">
+        <a href="{% url 'meme_maker:meme_download' meme.pk %}" class="meme-btn">
+            📥 Download Meme
+        </a>
+        {% if meme.template %}
+        <a href="{% url 'meme_maker:meme_editor' meme.template.pk %}" class="meme-btn meme-btn-secondary">
+            ✨ Create Another
+        </a>
+        {% else %}
+        <a href="{% url 'meme_maker:template_list' %}" class="meme-btn meme-btn-secondary">
+            🔍 Browse Templates
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{# Share URL #}
+<div style="margin-top: 2rem; text-align: center;">
+    <p class="meme-form-help">Share this meme:</p>
+    <input type="text" 
+           class="meme-form-control" 
+           value="{{ request.build_absolute_uri }}" 
+           readonly 
+           onclick="this.select();" 
+           style="max-width: 500px; margin: 0.5rem auto; text-align: center;">
+</div>
+{% endblock %}
+

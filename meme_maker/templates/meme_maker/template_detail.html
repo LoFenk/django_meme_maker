@@ -1,0 +1,76 @@
+{% extends meme_maker_base_template|default:"meme_maker/base.html" %}
+
+{% block header_title %}{{ template.title }}{% endblock %}
+{% block header_subtitle %}Meme Template{% endblock %}
+
+{% block meme_maker_content %}
+<div class="template-hero">
+    <div class="template-preview">
+        <img src="{{ template.image.url }}" alt="{{ template.title }}">
+    </div>
+    
+    <div class="template-info">
+        <h2>{{ template.title }}</h2>
+        
+        {% if template.tags %}
+        <div class="meme-tags" style="margin-bottom: 1.5rem;">
+            {% for tag in template.get_tags_list %}
+            <a href="{% url 'meme_maker:template_list' %}?q={{ tag }}" class="meme-tag">{{ tag }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <p class="meme-info-text" style="margin-bottom: 1.5rem;">
+            {{ template.memes.count }} meme{{ template.memes.count|pluralize }} created from this template
+        </p>
+        
+        <div class="meme-btn-group" style="justify-content: flex-start;">
+            <a href="{% url 'meme_maker:meme_editor' template.pk %}" class="meme-btn">
+                ✨ Make My Own
+            </a>
+            <a href="{% url 'meme_maker:template_download' template.pk %}" class="meme-btn meme-btn-secondary">
+                📥 Download Template
+            </a>
+        </div>
+        
+        <p class="meme-card-meta" style="margin-top: 2rem;">
+            Added {{ template.created_at|date:"F d, Y" }}
+        </p>
+    </div>
+</div>
+
+{% if recent_memes %}
+<div style="margin-top: 3rem;">
+    <h3 style="color: var(--meme-text-dark); margin-bottom: 1rem;">Recent Memes from this Template</h3>
+    <div class="meme-grid">
+        {% for meme in recent_memes %}
+        <a href="{% url 'meme_maker:meme_detail' meme.pk %}" class="meme-card">
+            {% if meme.generated_image %}
+            <img src="{{ meme.generated_image.url }}" alt="Meme #{{ meme.id }}" class="meme-card-image">
+            {% else %}
+            <div class="meme-card-image" style="position: relative; height: 200px; overflow: hidden;">
+                <img src="{{ template.image.url }}" alt="Meme #{{ meme.id }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% for overlay in meme.get_overlay_for_css %}
+                <div class="meme-text-overlay meme-text-{{ overlay.position }}" style="font-size: 1rem;">
+                    {{ overlay.text }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="meme-card-body">
+                <h3 class="meme-card-title">Meme #{{ meme.id }}</h3>
+                <p class="meme-card-meta">{{ meme.created_at|date:"M d, Y" }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div style="text-align: center; margin-top: 2rem;">
+    <a href="{% url 'meme_maker:template_list' %}" class="meme-btn meme-btn-secondary">
+        ← Back to Template Bank
+    </a>
+</div>
+{% endblock %}
+

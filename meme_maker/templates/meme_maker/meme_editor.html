@@ -1,0 +1,145 @@
+{% extends meme_maker_base_template|default:"meme_maker/base.html" %}
+
+{% block header_title %}Create Meme{% endblock %}
+{% block header_subtitle %}{{ template.title }}{% endblock %}
+
+{% block meme_maker_content %}
+<div class="meme-editor-container">
+    {# Preview Panel #}
+    <div class="meme-editor-preview">
+        <div class="meme-editor-preview-wrapper">
+            <img src="{{ template.image.url }}" alt="{{ template.title }}" id="preview-image">
+            <div class="meme-text-overlay meme-text-top" id="preview-top-text"></div>
+            <div class="meme-text-overlay meme-text-bottom" id="preview-bottom-text"></div>
+        </div>
+    </div>
+    
+    {# Controls Panel #}
+    <div class="meme-editor-controls">
+        <h3>Add Your Text</h3>
+        
+        <form method="post" id="meme-editor-form">
+            {% csrf_token %}
+            
+            <div class="meme-form-group">
+                <label for="id_top_text" class="meme-form-label">Top Text</label>
+                {{ form.top_text }}
+            </div>
+            
+            <div class="meme-form-group">
+                <label for="id_bottom_text" class="meme-form-label">Bottom Text</label>
+                {{ form.bottom_text }}
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 1.5rem 0;">
+            
+            <h3 style="margin-bottom: 1rem;">Text Style</h3>
+            
+            <div class="meme-form-row">
+                <div class="meme-form-group">
+                    <label for="id_text_color" class="meme-form-label">Text Color</label>
+                    {{ form.text_color }}
+                </div>
+                
+                <div class="meme-form-group">
+                    <label for="id_stroke_color" class="meme-form-label">Outline Color</label>
+                    {{ form.stroke_color }}
+                </div>
+            </div>
+            
+            <div class="meme-form-group">
+                <label for="id_font_size" class="meme-form-label">
+                    Font Size: <span id="font-size-display">48</span>px
+                </label>
+                {{ form.font_size }}
+            </div>
+            
+            <div class="meme-form-group">
+                <div class="meme-checkbox-group">
+                    {{ form.uppercase }}
+                    <label for="id_uppercase" class="meme-form-label" style="margin: 0;">
+                        UPPERCASE TEXT
+                    </label>
+                </div>
+            </div>
+            
+            {{ form.text_overlays_json }}
+            
+            <button type="submit" class="meme-btn meme-btn-full">
+                Create Meme →
+            </button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="{% url 'meme_maker:template_detail' template.pk %}" style="color: var(--meme-text-light); font-size: 0.9rem;">
+                ← Back to template
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // Get elements
+    const topTextInput = document.getElementById('id_top_text');
+    const bottomTextInput = document.getElementById('id_bottom_text');
+    const textColorInput = document.getElementById('id_text_color');
+    const strokeColorInput = document.getElementById('id_stroke_color');
+    const fontSizeInput = document.getElementById('id_font_size');
+    const uppercaseInput = document.getElementById('id_uppercase');
+    const fontSizeDisplay = document.getElementById('font-size-display');
+    
+    const previewTopText = document.getElementById('preview-top-text');
+    const previewBottomText = document.getElementById('preview-bottom-text');
+    
+    function updatePreview() {
+        let topText = topTextInput.value;
+        let bottomText = bottomTextInput.value;
+        
+        // Apply uppercase if checked
+        if (uppercaseInput.checked) {
+            topText = topText.toUpperCase();
+            bottomText = bottomText.toUpperCase();
+        }
+        
+        // Update text content
+        previewTopText.textContent = topText;
+        previewBottomText.textContent = bottomText;
+        
+        // Update colors
+        const textColor = textColorInput.value;
+        const strokeColor = strokeColorInput.value;
+        const textShadow = `
+            3px 3px 0 ${strokeColor},
+            -1px -1px 0 ${strokeColor},
+            1px -1px 0 ${strokeColor},
+            -1px 1px 0 ${strokeColor},
+            1px 1px 0 ${strokeColor},
+            0 3px 6px rgba(0, 0, 0, 0.5)
+        `;
+        
+        previewTopText.style.color = textColor;
+        previewTopText.style.textShadow = textShadow;
+        previewBottomText.style.color = textColor;
+        previewBottomText.style.textShadow = textShadow;
+        
+        // Update font size display
+        fontSizeDisplay.textContent = fontSizeInput.value;
+    }
+    
+    // Add event listeners
+    topTextInput.addEventListener('input', updatePreview);
+    bottomTextInput.addEventListener('input', updatePreview);
+    textColorInput.addEventListener('input', updatePreview);
+    strokeColorInput.addEventListener('input', updatePreview);
+    fontSizeInput.addEventListener('input', updatePreview);
+    uppercaseInput.addEventListener('change', updatePreview);
+    
+    // Initial update
+    updatePreview();
+})();
+</script>
+{% endblock %}
+

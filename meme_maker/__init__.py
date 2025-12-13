@@ -2,8 +2,15 @@
 Django Meme Maker
 =================
 
-A reusable Django app for creating and managing memes with customizable 
-embeddable templates.
+A reusable Django app for creating and managing memes with a searchable
+template bank and customizable embeddable templates.
+
+Features:
+- Template Bank: Search and browse meme templates by title/tags
+- Meme Editor: Create memes from templates with customizable text overlays
+- Image Generation: Automatic composite image generation with Pillow
+- Download Support: Download templates and generated memes
+- Storage Agnostic: Works with any Django storage backend
 
 Quick Start:
     1. Install: pip install django-meme-maker
@@ -14,10 +21,10 @@ Quick Start:
 For configuration options, see the README or the conf module.
 
 Usage after Django is loaded:
-    from meme_maker import Meme, MemeForm, MemeEditForm, meme_maker_settings
+    from meme_maker import Meme, MemeTemplate, MemeForm, meme_maker_settings
 """
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __author__ = 'Your Name'
 
 
@@ -34,12 +41,21 @@ def __getattr__(name):
     if name == 'Meme':
         from .models import Meme
         return Meme
+    elif name == 'MemeTemplate':
+        from .models import MemeTemplate
+        return MemeTemplate
     elif name == 'MemeForm':
         from .forms import MemeForm
         return MemeForm
     elif name == 'MemeEditForm':
         from .forms import MemeEditForm
         return MemeEditForm
+    elif name == 'MemeTemplateForm':
+        from .forms import MemeTemplateForm
+        return MemeTemplateForm
+    elif name == 'MemeEditorForm':
+        from .forms import MemeEditorForm
+        return MemeEditorForm
     elif name == 'meme_maker_settings':
         from .conf import meme_maker_settings
         return meme_maker_settings
@@ -48,8 +64,11 @@ def __getattr__(name):
 
 __all__ = [
     'Meme',
+    'MemeTemplate',
     'MemeForm',
     'MemeEditForm',
+    'MemeTemplateForm',
+    'MemeEditorForm',
     'meme_maker_settings',
     '__version__',
     'get_version',
