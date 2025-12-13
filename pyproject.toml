@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-meme-maker"
-version = "1.0.0"
-description = "A reusable Django app for creating and managing memes with customizable embeddable templates"
+version = "1.1.0"
+description = "A reusable Django app for creating and managing memes with a searchable template bank and customizable embeddable templates"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
