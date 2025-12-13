@@ -1,0 +1,54 @@
+{#
+Embeddable Meme Display Component
+=================================
+
+This component can be included in any template to display a meme with text overlay.
+
+Usage:
+    {% include "meme_maker/components/meme_display.html" with meme=meme %}
+
+Required context:
+    - meme: A Meme model instance
+
+Optional context:
+    - show_info: Whether to show meme info below (default: False)
+    - show_actions: Whether to show action buttons (default: False)
+#}
+
+<div class="meme-display">
+    <div class="meme-display-wrapper">
+        <img src="{{ meme.image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image">
+        {% if meme.top_text %}
+        <div class="meme-text-overlay meme-text-top">{{ meme.top_text }}</div>
+        {% endif %}
+        {% if meme.bottom_text %}
+        <div class="meme-text-overlay meme-text-bottom">{{ meme.bottom_text }}</div>
+        {% endif %}
+    </div>
+</div>
+
+{% if show_info %}
+<div class="meme-info">
+    <p class="meme-info-text">
+        <strong>Created:</strong> {{ meme.created_at|date:"F d, Y g:i A" }}
+    </p>
+    {% if meme.top_text %}
+    <p class="meme-info-text"><strong>Top text:</strong> {{ meme.top_text }}</p>
+    {% endif %}
+    {% if meme.bottom_text %}
+    <p class="meme-info-text"><strong>Bottom text:</strong> {{ meme.bottom_text }}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if show_actions %}
+<div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+    <a href="{% url 'meme_maker:create' %}" class="meme-btn">
+        Create Another →
+    </a>
+    <a href="{{ meme.image.url }}" download class="meme-btn meme-btn-secondary">
+        Download Image
+    </a>
+</div>
+{% endif %}
+

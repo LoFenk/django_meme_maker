@@ -1,0 +1,26 @@
+# Include templates
+recursive-include meme_maker/templates *
+
+# Include static files
+recursive-include meme_maker/static *
+
+# Include migrations
+recursive-include meme_maker/migrations *.py
+
+# Include package data
+include README.md
+include LICENSE
+include pyproject.toml
+
+# Exclude development and test files
+exclude .gitignore
+exclude .env
+exclude *.pyc
+exclude __pycache__
+
+# Exclude example project files
+prune meme_maker_project
+prune example_project
+prune venv
+prune .git
+

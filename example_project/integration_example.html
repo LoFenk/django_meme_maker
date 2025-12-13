@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% load meme_maker_tags %}
+
+{% block title %}Meme Gallery | My Site{% endblock %}
+
+{% block extra_head %}
+{# Include meme maker styles #}
+{% meme_maker_css %}
+
+<style>
+    .hero {
+        text-align: center;
+        padding: 3rem 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        margin-bottom: 2rem;
+        border-radius: 12px;
+    }
+    
+    .hero h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .hero p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    
+    .section {
+        margin-bottom: 3rem;
+    }
+    
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        color: #1a1a2e;
+    }
+    
+    .view-all-link {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    
+    .view-all-link:hover {
+        text-decoration: underline;
+    }
+    
+    .two-column {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+    
+    @media (max-width: 768px) {
+        .two-column {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .featured-meme {
+        background: #f8fafc;
+        padding: 2rem;
+        border-radius: 12px;
+    }
+    
+    .create-section {
+        background: #f8fafc;
+        padding: 2rem;
+        border-radius: 12px;
+    }
+    
+    .create-section h3 {
+        margin-bottom: 1.5rem;
+        color: #1a1a2e;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>🎭 Meme Gallery</h1>
+    <p>Create and share your favorite memes</p>
+</div>
+
+{# Get recent memes using the template tag #}
+{% get_recent_memes 6 as recent_memes %}
+
+<div class="section">
+    <div class="section-header">
+        <h2 class="section-title">Recent Memes</h2>
+        <a href="{% url 'meme_maker:list' %}" class="view-all-link">View All →</a>
+    </div>
+    
+    {# Use the meme grid component #}
+    {% render_meme_grid recent_memes %}
+</div>
+
+<div class="two-column">
+    <div class="section featured-meme">
+        <h3>Featured Meme</h3>
+        {% if recent_memes %}
+            {# Render the most recent meme with full info #}
+            {% render_meme recent_memes.0 show_info=True show_actions=True %}
+        {% else %}
+            <p>No memes yet! Create the first one.</p>
+        {% endif %}
+    </div>
+    
+    <div class="section create-section">
+        <h3>Quick Create</h3>
+        {# You can include the form component here, but you'd need to pass a form #}
+        {# For a full form, link to the create page instead #}
+        <p style="margin-bottom: 1rem; color: #666;">
+            Want to create your own meme? It only takes a few seconds!
+        </p>
+        <a href="{% url 'meme_maker:create' %}" class="meme-btn">
+            Create a Meme →
+        </a>
+    </div>
+</div>
+
+{# Alternative: Include meme cards individually #}
+<!--
+<div class="section">
+    <h2>Meme Showcase</h2>
+    <div class="meme-grid">
+        {% for meme in recent_memes %}
+            {% render_meme_card meme show_date=False %}
+        {% endfor %}
+    </div>
+</div>
+-->
+
+{# Alternative: Include component templates directly #}
+<!--
+{% include "meme_maker/components/meme_grid.html" with memes=recent_memes max_items=3 %}
+-->
+
+{# Using meme maker settings #}
+{% get_meme_maker_settings as mm_settings %}
+<!--
+<p>Primary color: {{ mm_settings.PRIMARY_COLOR }}</p>
+<p>Meme maker title: {{ mm_settings.TITLE }}</p>
+-->
+
+{% endblock %}
+

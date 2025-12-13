@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}My Awesome Site{% endblock %}</title>
+    
+    <!-- Your site's CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    
+    <!-- This block allows meme maker (and other apps) to inject styles -->
+    {% block extra_head %}{% endblock %}
+    
+    <style>
+        /* Your site's base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .site-header {
+            background: #1a1a2e;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .site-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .site-nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+        
+        .site-nav a {
+            color: #a0aec0;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .site-nav a:hover {
+            color: white;
+        }
+        
+        .site-main {
+            min-height: calc(100vh - 140px);
+            padding: 2rem;
+        }
+        
+        .site-footer {
+            background: #f7f7f7;
+            padding: 1.5rem 2rem;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="/" class="site-logo">My Awesome Site</a>
+        
+        <nav class="site-nav">
+            <a href="/">Home</a>
+            <a href="/about/">About</a>
+            <a href="/memes/">Meme Maker</a>
+            <a href="/contact/">Contact</a>
+        </nav>
+    </header>
+    
+    <main class="site-main">
+        <!--
+        This is where meme maker content will be rendered.
+        
+        The block name should match MEME_MAKER['CONTENT_BLOCK_NAME']
+        or use the default 'content' or 'meme_maker_content'.
+        -->
+        {% block content %}
+        {% block meme_maker_content %}
+        <!-- Default content if no block is provided -->
+        <h1>Welcome to My Awesome Site</h1>
+        {% endblock %}
+        {% endblock %}
+    </main>
+    
+    <footer class="site-footer">
+        <p>&copy; 2024 My Awesome Site. All rights reserved.</p>
+    </footer>
+    
+    <!-- Your site's JavaScript -->
+    <script src="/static/js/main.js"></script>
+    
+    <!-- This block allows meme maker (and other apps) to inject scripts -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+
