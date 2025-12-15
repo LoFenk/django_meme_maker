@@ -28,6 +28,20 @@ MEME_MAKER = {
     
     # Custom CSS to inject
     'CUSTOM_CSS': '',
+    
+    # Watermark image path (absolute path or relative to STATIC_ROOT/STATICFILES_DIRS)
+    # If set, this image will be placed at the bottom-right corner of all generated memes
+    # Example: '/path/to/watermark.png' or 'images/my-watermark.png'
+    'WATERMARK_IMAGE': None,
+    
+    # Watermark opacity (0.0 to 1.0, where 1.0 is fully opaque)
+    'WATERMARK_OPACITY': 0.7,
+    
+    # Watermark scale (relative to meme width, e.g., 0.15 = 15% of meme width)
+    'WATERMARK_SCALE': 0.15,
+    
+    # Watermark padding from edges (in pixels)
+    'WATERMARK_PADDING': 10,
 }
 """
 
@@ -41,6 +55,7 @@ class MemeMakerSettings:
     Example:
         from meme_maker.conf import meme_maker_settings
         print(meme_maker_settings.UPLOAD_PATH)
+        print(meme_maker_settings.WATERMARK_IMAGE)
     """
     
     DEFAULTS = {
@@ -53,6 +68,11 @@ class MemeMakerSettings:
         'SHOW_NAV': True,
         'CUSTOM_CSS': '',
         'CONTENT_BLOCK_NAME': 'content',
+        # Watermark settings
+        'WATERMARK_IMAGE': None,  # Path to watermark image
+        'WATERMARK_OPACITY': 0.7,  # 0.0 to 1.0
+        'WATERMARK_SCALE': 0.15,  # Relative to meme width
+        'WATERMARK_PADDING': 10,  # Pixels from edge
     }
     
     def __init__(self):

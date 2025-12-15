@@ -1,6 +1,3 @@
-# Preface
-Let me first be honest here, this is a vibe coded project for my own use. All Credit to Claude Opus 4.5 on Cursor - incredible work. This very paragraph is my input, other than prompts, I have no merit otherwise. Feel free to reuse as you see fit.
-
 # Publishing Guide for django-meme-maker
 
 This guide walks you through publishing the package to PyPI so it can be installed with `pip install django-meme-maker`.

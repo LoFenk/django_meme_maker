@@ -4,6 +4,30 @@
 {% block header_subtitle %}Browse created memes{% endblock %}
 
 {% block meme_maker_content %}
+{# Sort Controls #}
+<div class="meme-sort-bar">
+    <div>
+        <label for="sort-select">Sort by:</label>
+        <select id="sort-select" onchange="updateSort(this.value)">
+            <option value="-created" {% if order_by == '-created' %}selected{% endif %}>Newest First</option>
+            <option value="created" {% if order_by == 'created' %}selected{% endif %}>Oldest First</option>
+            <option value="-rating" {% if order_by == '-rating' %}selected{% endif %}>Highest Rated</option>
+            <option value="rating" {% if order_by == 'rating' %}selected{% endif %}>Lowest Rated</option>
+        </select>
+    </div>
+    <span style="color: var(--meme-text-light);">
+        {{ memes|length }} meme{{ memes|length|pluralize }}
+    </span>
+</div>
+
+<script>
+function updateSort(value) {
+    const url = new URL(window.location);
+    url.searchParams.set('order', value);
+    window.location = url;
+}
+</script>
+
 {% if memes %}
 <div class="meme-grid">
     {% for meme in memes %}
@@ -32,6 +56,14 @@
                 Meme #{{ meme.id }}
                 {% endif %}
             </h3>
+            {# Rating display - inline for simplicity #}
+            <div class="meme-rating-compact">
+                <span class="star">★</span>
+                <span>{{ meme.get_average_rating }}</span>
+                {% if meme.rating_count > 0 %}
+                <span>({{ meme.rating_count }})</span>
+                {% endif %}
+            </div>
             {% if meme.top_text %}
             <p class="meme-card-text"><strong>Top:</strong> {{ meme.top_text|truncatewords:8 }}</p>
             {% endif %}
@@ -47,8 +79,8 @@
 {% if is_paginated %}
 <div class="meme-pagination">
     {% if page_obj.has_previous %}
-    <a href="?page=1">&laquo; First</a>
-    <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+    <a href="?order={{ order_by }}&page=1">&laquo; First</a>
+    <a href="?order={{ order_by }}&page={{ page_obj.previous_page_number }}">Previous</a>
     {% endif %}
     
     <span class="current">
@@ -56,8 +88,8 @@
     </span>
     
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}">Next</a>
-    <a href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+    <a href="?order={{ order_by }}&page={{ page_obj.next_page_number }}">Next</a>
+    <a href="?order={{ order_by }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
     {% endif %}
 </div>
 {% endif %}

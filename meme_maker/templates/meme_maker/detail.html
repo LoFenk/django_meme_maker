@@ -7,16 +7,16 @@
 <div class="meme-display">
     <div class="meme-display-wrapper">
         <img src="{{ meme.image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
-        {% if meme.top_text %}
+            {% if meme.top_text %}
         <div class="meme-text-overlay meme-text-top">{{ meme.top_text }}</div>
-        {% endif %}
-        {% if meme.bottom_text %}
+            {% endif %}
+            {% if meme.bottom_text %}
         <div class="meme-text-overlay meme-text-bottom">{{ meme.bottom_text }}</div>
-        {% endif %}
+            {% endif %}
     </div>
-</div>
+        </div>
 
-<div class="meme-info">
+        <div class="meme-info">
     <p class="meme-info-text">
         <strong>Created:</strong> {{ meme.created_at|date:"F d, Y g:i A" }}
     </p>

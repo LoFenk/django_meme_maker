@@ -5,17 +5,20 @@ Provides views for:
 - Template bank (search, list, detail, upload)
 - Meme editor (create memes from templates)
 - Meme display and download
+- Rating system for templates and memes
 - Legacy views for backward compatibility
 """
 
+import json
 import mimetypes
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, FileResponse, Http404
+from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from django.contrib import messages
 from django.views.generic import CreateView, DetailView, ListView
+from django.views.decorators.http import require_POST
 from django.core.files.storage import default_storage
 
-from .models import Meme, MemeTemplate
+from .models import Meme, MemeTemplate, TemplateRating, MemeRating
 from .forms import (
     MemeForm, MemeEditForm, MemeTemplateForm, 
     MemeTemplateSearchForm, MemeEditorForm
@@ -50,19 +53,24 @@ def template_list(request):
     
     Users can search templates by title and tags.
     Shows a grid of available templates.
+    Supports ordering by rating, date, or title.
     """
     form = MemeTemplateSearchForm(request.GET)
     query = request.GET.get('q', '').strip()
+    order_by = request.GET.get('order', '-created')  # Default: newest first
     
-    if query:
-        templates = MemeTemplate.search(query)
-    else:
-        templates = MemeTemplate.objects.all()
+    # Valid ordering options
+    valid_orders = ['rating', '-rating', 'created', '-created', 'title', '-title']
+    if order_by not in valid_orders:
+        order_by = '-created'
+    
+    templates = MemeTemplate.search(query, order_by=order_by)
     
     context = {
         'templates': templates,
         'search_form': form,
         'query': query,
+        'order_by': order_by,
         'title': 'Template Bank',
         'page_type': 'template_list',
     }
@@ -78,15 +86,28 @@ def template_detail(request, pk):
     Shows the template image and provides:
     - Download template button
     - "Make my own" button → links to meme editor
+    - Star rating widget
     """
     template = get_object_or_404(MemeTemplate, pk=pk)
     
     # Get recent memes made from this template
     recent_memes = template.memes.all()[:6]
     
+    # Check if user has already rated this template
+    user_rating = None
+    if request.session.session_key:
+        try:
+            user_rating = TemplateRating.objects.get(
+                template=template,
+                session_key=request.session.session_key
+            ).stars
+        except TemplateRating.DoesNotExist:
+            pass
+    
     context = {
         'template': template,
         'recent_memes': recent_memes,
+        'user_rating': user_rating,
         'title': template.title,
         'page_type': 'template_detail',
     }
@@ -212,11 +233,24 @@ def meme_detail(request, pk):
     View to display a single meme.
     
     Shows the meme with text overlays and provides download option.
+    Includes star rating widget.
     """
     meme = get_object_or_404(Meme, pk=pk)
     
+    # Check if user has already rated this meme
+    user_rating = None
+    if request.session.session_key:
+        try:
+            user_rating = MemeRating.objects.get(
+                meme=meme,
+                session_key=request.session.session_key
+            ).stars
+        except MemeRating.DoesNotExist:
+            pass
+    
     context = {
         'meme': meme,
+        'user_rating': user_rating,
         'title': f'Meme #{meme.pk}',
         'page_type': 'meme_detail',
     }
@@ -226,11 +260,43 @@ def meme_detail(request, pk):
 
 
 def meme_list(request):
-    """View to display all memes."""
+    """
+    View to display all memes.
+    Supports ordering by rating, date.
+    """
+    order_by = request.GET.get('order', '-created')  # Default: newest first
+    
+    # Valid ordering options
+    valid_orders = ['rating', '-rating', 'created', '-created']
+    if order_by not in valid_orders:
+        order_by = '-created'
+    
     memes = Meme.objects.all()
+    
+    # Apply ordering
+    if order_by == 'rating' or order_by == '-rating':
+        from django.db.models import Case, When, F, FloatField, Value
+        from django.db.models.functions import Cast
+        
+        memes = memes.annotate(
+            avg_rating=Case(
+                When(rating_count=0, then=Value(0.0)),
+                default=Cast(F('rating_sum'), FloatField()) / Cast(F('rating_count'), FloatField()),
+                output_field=FloatField()
+            )
+        )
+        if order_by == '-rating':
+            memes = memes.order_by('-avg_rating', '-rating_count', '-created_at')
+        else:
+            memes = memes.order_by('avg_rating', 'rating_count', 'created_at')
+    elif order_by == 'created':
+        memes = memes.order_by('created_at')
+    else:  # -created
+        memes = memes.order_by('-created_at')
     
     context = {
         'memes': memes,
+        'order_by': order_by,
         'title': 'All Memes',
         'page_type': 'meme_list',
     }
@@ -272,6 +338,111 @@ def meme_download(request, pk):
         return response
     except Exception:
         raise Http404("Could not retrieve meme image")
+
+
+# =============================================================================
+# RATING VIEWS
+# =============================================================================
+
+def _ensure_session(request):
+    """Ensure the request has a session key."""
+    if not request.session.session_key:
+        request.session.create()
+    return request.session.session_key
+
+
+@require_POST
+def rate_template(request, pk):
+    """
+    AJAX endpoint to rate a template.
+    
+    POST data: { "stars": 1-5 }
+    Returns: { "success": true, "average_rating": X.X, "rating_count": N, "user_rating": N }
+    """
+    template = get_object_or_404(MemeTemplate, pk=pk)
+    
+    try:
+        data = json.loads(request.body)
+        stars = int(data.get('stars', 0))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+    
+    if not 1 <= stars <= 5:
+        return JsonResponse({'success': False, 'error': 'Rating must be 1-5'}, status=400)
+    
+    session_key = _ensure_session(request)
+    
+    # Check for existing rating
+    try:
+        existing = TemplateRating.objects.get(template=template, session_key=session_key)
+        old_stars = existing.stars
+        existing.stars = stars
+        existing.save()
+        # Update aggregate: remove old, add new
+        template.update_rating(old_stars, stars)
+    except TemplateRating.DoesNotExist:
+        # Create new rating
+        TemplateRating.objects.create(
+            template=template,
+            session_key=session_key,
+            stars=stars
+        )
+        template.add_rating(stars)
+    
+    return JsonResponse({
+        'success': True,
+        'average_rating': template.get_average_rating(),
+        'rating_count': template.rating_count,
+        'user_rating': stars,
+        'rating_display': template.get_rating_display(),
+    })
+
+
+@require_POST
+def rate_meme(request, pk):
+    """
+    AJAX endpoint to rate a meme.
+    
+    POST data: { "stars": 1-5 }
+    Returns: { "success": true, "average_rating": X.X, "rating_count": N, "user_rating": N }
+    """
+    meme = get_object_or_404(Meme, pk=pk)
+    
+    try:
+        data = json.loads(request.body)
+        stars = int(data.get('stars', 0))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+    
+    if not 1 <= stars <= 5:
+        return JsonResponse({'success': False, 'error': 'Rating must be 1-5'}, status=400)
+    
+    session_key = _ensure_session(request)
+    
+    # Check for existing rating
+    try:
+        existing = MemeRating.objects.get(meme=meme, session_key=session_key)
+        old_stars = existing.stars
+        existing.stars = stars
+        existing.save()
+        # Update aggregate: remove old, add new
+        meme.update_rating(old_stars, stars)
+    except MemeRating.DoesNotExist:
+        # Create new rating
+        MemeRating.objects.create(
+            meme=meme,
+            session_key=session_key,
+            stars=stars
+        )
+        meme.add_rating(stars)
+    
+    return JsonResponse({
+        'success': True,
+        'average_rating': meme.get_average_rating(),
+        'rating_count': meme.rating_count,
+        'user_rating': stars,
+        'rating_display': meme.get_rating_display(),
+    })
 
 
 # =============================================================================

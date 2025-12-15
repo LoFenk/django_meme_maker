@@ -93,6 +93,7 @@
     
     const previewTopText = document.getElementById('preview-top-text');
     const previewBottomText = document.getElementById('preview-bottom-text');
+    const previewImage = document.getElementById('preview-image');
     
     function updatePreview() {
         let topText = topTextInput.value;
@@ -111,22 +112,47 @@
         // Update colors
         const textColor = textColorInput.value;
         const strokeColor = strokeColorInput.value;
+        
+        // Calculate stroke width based on font size
+        const fontSize = parseInt(fontSizeInput.value) || 48;
+        const strokeWidth = Math.max(2, Math.floor(fontSize / 16));
+        
         const textShadow = `
-            3px 3px 0 ${strokeColor},
-            -1px -1px 0 ${strokeColor},
-            1px -1px 0 ${strokeColor},
-            -1px 1px 0 ${strokeColor},
-            1px 1px 0 ${strokeColor},
-            0 3px 6px rgba(0, 0, 0, 0.5)
+            ${strokeWidth}px ${strokeWidth}px 0 ${strokeColor},
+            -${strokeWidth}px -${strokeWidth}px 0 ${strokeColor},
+            ${strokeWidth}px -${strokeWidth}px 0 ${strokeColor},
+            -${strokeWidth}px ${strokeWidth}px 0 ${strokeColor},
+            0 ${strokeWidth}px 0 ${strokeColor},
+            ${strokeWidth}px 0 0 ${strokeColor},
+            0 -${strokeWidth}px 0 ${strokeColor},
+            -${strokeWidth}px 0 0 ${strokeColor},
+            0 ${strokeWidth + 3}px 6px rgba(0, 0, 0, 0.5)
         `;
         
+        // Apply text color
         previewTopText.style.color = textColor;
-        previewTopText.style.textShadow = textShadow;
         previewBottomText.style.color = textColor;
+        
+        // Apply text shadow (stroke effect)
+        previewTopText.style.textShadow = textShadow;
         previewBottomText.style.textShadow = textShadow;
         
+        // Apply font size - scale it relative to the preview image
+        // The preview is smaller than the actual image, so we scale proportionally
+        const previewWidth = previewImage.offsetWidth || 500;
+        const scaleFactor = previewWidth / 800; // Assume 800px as reference width
+        const scaledFontSize = Math.max(12, Math.round(fontSize * scaleFactor));
+        
+        previewTopText.style.fontSize = scaledFontSize + 'px';
+        previewBottomText.style.fontSize = scaledFontSize + 'px';
+        
         // Update font size display
-        fontSizeDisplay.textContent = fontSizeInput.value;
+        fontSizeDisplay.textContent = fontSize;
+        
+        // Apply text transform based on uppercase checkbox
+        const textTransform = uppercaseInput.checked ? 'uppercase' : 'none';
+        previewTopText.style.textTransform = textTransform;
+        previewBottomText.style.textTransform = textTransform;
     }
     
     // Add event listeners
@@ -137,9 +163,17 @@
     fontSizeInput.addEventListener('input', updatePreview);
     uppercaseInput.addEventListener('change', updatePreview);
     
+    // Update on window resize (for responsive font scaling)
+    window.addEventListener('resize', updatePreview);
+    
+    // Also update when image loads (for correct sizing)
+    previewImage.addEventListener('load', updatePreview);
+    
     // Initial update
     updatePreview();
+    
+    // Update again after a short delay to ensure image is loaded
+    setTimeout(updatePreview, 100);
 })();
 </script>
 {% endblock %}
-

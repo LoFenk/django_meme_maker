@@ -5,49 +5,49 @@
 
 {% block meme_maker_content %}
 <form method="post" enctype="multipart/form-data" class="meme-form">
-    {% csrf_token %}
-    
+            {% csrf_token %}
+            
     <div class="meme-form-group">
         <label for="{{ form.image.id_for_label }}" class="meme-form-label">
             {{ form.image.label }}
         </label>
-        {{ form.image }}
-        {% if form.image.help_text %}
+                {{ form.image }}
+                {% if form.image.help_text %}
         <p class="meme-form-help">{{ form.image.help_text }}</p>
-        {% endif %}
-        {% if form.image.errors %}
+                {% endif %}
+                {% if form.image.errors %}
         <p class="meme-form-error">{{ form.image.errors.0 }}</p>
-        {% endif %}
-    </div>
-    
+                {% endif %}
+            </div>
+
     <div class="meme-form-group">
         <label for="{{ form.top_text.id_for_label }}" class="meme-form-label">
             {{ form.top_text.label }}
         </label>
-        {{ form.top_text }}
-        {% if form.top_text.help_text %}
+                {{ form.top_text }}
+                {% if form.top_text.help_text %}
         <p class="meme-form-help">{{ form.top_text.help_text }}</p>
-        {% endif %}
-        {% if form.top_text.errors %}
+                {% endif %}
+                {% if form.top_text.errors %}
         <p class="meme-form-error">{{ form.top_text.errors.0 }}</p>
-        {% endif %}
-    </div>
-    
+                {% endif %}
+            </div>
+
     <div class="meme-form-group">
         <label for="{{ form.bottom_text.id_for_label }}" class="meme-form-label">
             {{ form.bottom_text.label }}
         </label>
-        {{ form.bottom_text }}
-        {% if form.bottom_text.help_text %}
+                {{ form.bottom_text }}
+                {% if form.bottom_text.help_text %}
         <p class="meme-form-help">{{ form.bottom_text.help_text }}</p>
-        {% endif %}
-        {% if form.bottom_text.errors %}
+                {% endif %}
+                {% if form.bottom_text.errors %}
         <p class="meme-form-error">{{ form.bottom_text.errors.0 }}</p>
-        {% endif %}
-    </div>
-    
+                {% endif %}
+            </div>
+
     <button type="submit" class="meme-btn meme-btn-full">
         Create Meme →
     </button>
-</form>
+        </form>
 {% endblock %}

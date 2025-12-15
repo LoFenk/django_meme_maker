@@ -48,10 +48,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/django-meme-maker"
-Documentation = "https://github.com/yourusername/django-meme-maker#readme"
-Repository = "https://github.com/yourusername/django-meme-maker.git"
-Issues = "https://github.com/yourusername/django-meme-maker/issues"
+Homepage = "https://github.com/LoFenk/django_meme_maker"
+Documentation = "https://github.com/LoFenk/django_meme_maker#readme"
+Repository = "https://github.com/LoFenk/django_meme_maker.git"
+Issues = "https://github.com/LoFenk/django_meme_maker/issues"
 
 [tool.setuptools]
 packages = ["meme_maker"]

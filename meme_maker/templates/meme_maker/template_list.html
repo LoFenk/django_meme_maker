@@ -12,19 +12,38 @@
            class="meme-form-control" 
            placeholder="Search templates by name or tags..."
            autocomplete="off">
+    <input type="hidden" name="order" value="{{ order_by }}">
     <button type="submit" class="meme-btn">Search</button>
 </form>
 
-{% if query %}
-<p style="text-align: center; color: var(--meme-text-light); margin-bottom: 1rem;">
-    {% if templates %}
+{# Sort Controls #}
+<div class="meme-sort-bar">
+    <div>
+        <label for="sort-select">Sort by:</label>
+        <select id="sort-select" onchange="updateSort(this.value)">
+            <option value="-created" {% if order_by == '-created' %}selected{% endif %}>Newest First</option>
+            <option value="created" {% if order_by == 'created' %}selected{% endif %}>Oldest First</option>
+            <option value="-rating" {% if order_by == '-rating' %}selected{% endif %}>Highest Rated</option>
+            <option value="rating" {% if order_by == 'rating' %}selected{% endif %}>Lowest Rated</option>
+            <option value="title" {% if order_by == 'title' %}selected{% endif %}>Title A-Z</option>
+            <option value="-title" {% if order_by == '-title' %}selected{% endif %}>Title Z-A</option>
+        </select>
+    </div>
+    {% if query %}
+    <span style="color: var(--meme-text-light);">
         Found {{ templates|length }} template{{ templates|length|pluralize }} for "{{ query }}"
-    {% else %}
-        No templates found for "{{ query }}"
+        <a href="{% url 'meme_maker:template_list' %}" style="color: var(--meme-primary);">Clear</a>
+    </span>
     {% endif %}
-    <a href="{% url 'meme_maker:template_list' %}" style="color: var(--meme-primary);">Clear search</a>
-</p>
-{% endif %}
+</div>
+
+<script>
+function updateSort(value) {
+    const url = new URL(window.location);
+    url.searchParams.set('order', value);
+    window.location = url;
+}
+</script>
 
 {% if templates %}
 <div class="meme-grid">
@@ -33,6 +52,14 @@
         <img src="{{ template.image.url }}" alt="{{ template.title }}" class="meme-card-image">
         <div class="meme-card-body">
             <h3 class="meme-card-title">{{ template.title }}</h3>
+            {# Rating display - inline for simplicity #}
+            <div class="meme-rating-compact">
+                <span class="star">★</span>
+                <span>{{ template.get_average_rating }}</span>
+                {% if template.rating_count > 0 %}
+                <span>({{ template.rating_count }})</span>
+                {% endif %}
+            </div>
             {% if template.tags %}
             <div class="meme-tags">
                 {% for tag in template.get_tags_list %}
@@ -49,8 +76,8 @@
 {% if is_paginated %}
 <div class="meme-pagination">
     {% if page_obj.has_previous %}
-    <a href="?{% if query %}q={{ query }}&{% endif %}page=1">&laquo; First</a>
-    <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page=1">&laquo; First</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page={{ page_obj.previous_page_number }}">Previous</a>
     {% endif %}
     
     <span class="current">
@@ -58,8 +85,8 @@
     </span>
     
     {% if page_obj.has_next %}
-    <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
-    <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page={{ page_obj.next_page_number }}">Next</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
     {% endif %}
 </div>
 {% endif %}

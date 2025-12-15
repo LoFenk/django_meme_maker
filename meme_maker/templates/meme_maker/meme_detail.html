@@ -30,6 +30,50 @@
 </div>
 
 <div class="meme-info">
+    {# Rating Widget - Inline #}
+    <div style="margin-bottom: 1.5rem;">
+        {% csrf_token %}
+        <div class="meme-rating" 
+             data-rating-widget 
+             data-type="meme" 
+             data-pk="{{ meme.pk }}"
+             data-rate-url="{% url 'meme_maker:rate_meme' pk=meme.pk %}">
+            
+            {# Display current rating #}
+            <div class="meme-rating-display" data-rating-display>
+                {% with avg=meme.get_average_rating %}
+                <span class="star{% if avg < 1 %} empty{% endif %}">{% if avg >= 1 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 2 %} empty{% endif %}">{% if avg >= 2 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 3 %} empty{% endif %}">{% if avg >= 3 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 4 %} empty{% endif %}">{% if avg >= 4 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 5 %} empty{% endif %}">{% if avg >= 5 %}★{% else %}☆{% endif %}</span>
+                {% endwith %}
+            </div>
+            
+            <span class="meme-rating-text" data-rating-text>
+                {{ meme.get_rating_display }}
+            </span>
+            
+            {# Interactive rating stars #}
+            <div class="meme-rating-stars" data-rating-input style="margin-left: 1rem;">
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star5-meme-{{ meme.pk }}" value="5" {% if user_rating == 5 %}checked{% endif %}>
+                <label for="star5-meme-{{ meme.pk }}" data-value="5" title="Rate 5 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star4-meme-{{ meme.pk }}" value="4" {% if user_rating == 4 %}checked{% endif %}>
+                <label for="star4-meme-{{ meme.pk }}" data-value="4" title="Rate 4 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star3-meme-{{ meme.pk }}" value="3" {% if user_rating == 3 %}checked{% endif %}>
+                <label for="star3-meme-{{ meme.pk }}" data-value="3" title="Rate 3 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star2-meme-{{ meme.pk }}" value="2" {% if user_rating == 2 %}checked{% endif %}>
+                <label for="star2-meme-{{ meme.pk }}" data-value="2" title="Rate 2 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star1-meme-{{ meme.pk }}" value="1" {% if user_rating == 1 %}checked{% endif %}>
+                <label for="star1-meme-{{ meme.pk }}" data-value="1" title="Rate 1 star">★</label>
+            </div>
+        </div>
+    </div>
+    
     <p class="meme-info-text">
         <strong>Created:</strong> {{ meme.created_at|date:"F d, Y g:i A" }}
     </p>

@@ -1,3 +1,7 @@
+# Preface
+Let me first be honest here, this is a vibe coded project for my own use. All Credit to Claude Opus 4.5 on Cursor - incredible work. This very paragraph some of the little work I did - other than fiddling around with prompts. I have no merit otherwise. Feel free to reuse as you see fit.
+
+
 # Django Meme Maker
 
 A reusable Django app for creating and managing memes with a searchable template bank and customizable, embeddable templates. Perfect for adding meme creation functionality to any Django project.
@@ -9,6 +13,8 @@ A reusable Django app for creating and managing memes with a searchable template
 - 🎨 **Text Styling** - Configure colors, font size, and positioning
 - 📥 **Download Support** - Download both templates and generated memes
 - 🖼️ **Image Generation** - Automatic composite image generation with Pillow
+- 💧 **Watermark Support** - Add your logo/watermark to all generated memes
+- ⭐ **Rating System** - Rate templates and memes with star ratings
 - 💾 **Storage agnostic** - Works with any Django storage backend (local, S3, GCS, etc.)
 - 📦 **Embeddable components** - Include meme functionality in any template
 - 🔌 **Plug and play** - Simple installation with sensible defaults
@@ -34,13 +40,13 @@ pip install django-meme-maker
 ### Via pip (from source/GitHub)
 
 ```bash
-pip install git+https://github.com/yourusername/django-meme-maker.git
+pip install git+https://github.com/LoFenk/django_meme_maker.git
 ```
 
 ### For development
 
 ```bash
-git clone https://github.com/yourusername/django-meme-maker.git
+git clone https://github.com/LoFenk/django_meme_maker.git
 cd django-meme-maker
 pip install -e ".[dev]"
 ```
@@ -128,8 +134,45 @@ MEME_MAKER = {
     
     # Name of the content block in your base template
     'CONTENT_BLOCK_NAME': 'content',
+    
+    # Watermark image path (absolute path or relative to STATIC_ROOT/STATICFILES_DIRS)
+    # If set, this image will be placed at the bottom-right corner of all generated memes
+    'WATERMARK_IMAGE': None,  # e.g., '/path/to/watermark.png' or 'images/my-watermark.png'
+    
+    # Watermark opacity (0.0 to 1.0, where 1.0 is fully opaque)
+    'WATERMARK_OPACITY': 0.7,
+    
+    # Watermark scale (relative to meme width, e.g., 0.15 = 15% of meme width)
+    'WATERMARK_SCALE': 0.15,
+    
+    # Watermark padding from edges (in pixels)
+    'WATERMARK_PADDING': 10,
 }
 ```
+
+### Watermark Configuration
+
+To add your logo or watermark to all generated memes:
+
+```python
+# settings.py
+MEME_MAKER = {
+    # Option 1: Absolute path to watermark image
+    'WATERMARK_IMAGE': '/absolute/path/to/watermark.png',
+    
+    # Option 2: Path relative to your static files
+    'WATERMARK_IMAGE': 'images/my-watermark.png',
+    
+    # Customize appearance
+    'WATERMARK_OPACITY': 0.7,   # 70% opaque
+    'WATERMARK_SCALE': 0.15,    # 15% of meme width
+    'WATERMARK_PADDING': 10,    # 10px from edges
+}
+```
+
+The watermark will be automatically scaled to maintain aspect ratio and placed in the bottom-right corner of all generated meme images.
+
+**Tip:** Use a transparent PNG for best results.
 
 ## URLs Reference
 

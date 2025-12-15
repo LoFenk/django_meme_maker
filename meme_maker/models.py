@@ -1,9 +1,11 @@
 """
 Models for django-meme-maker.
 
-This module contains two main models:
+This module contains the following models:
 - MemeTemplate: Reusable meme template images with titles and tags
 - Meme: User-created memes based on templates with text overlays
+- TemplateRating: Star ratings for templates
+- MemeRating: Star ratings for memes
 
 Image Generation Strategy (IMPORTANT):
 --------------------------------------
@@ -25,6 +27,11 @@ We use a HYBRID approach for storing meme data:
 
 The generated image is created using Pillow when available. If Pillow fails
 or isn't available, we fall back to serving the template with CSS text overlay.
+
+Rating System:
+--------------
+Both templates and memes support 1-5 star ratings. Ratings are tracked per
+session to prevent duplicate voting while not requiring authentication.
 """
 
 import json
@@ -34,6 +41,7 @@ from django.db import models
 from django.urls import reverse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .conf import meme_maker_settings
 
@@ -54,7 +62,66 @@ def meme_upload_path(instance, filename):
     return f'{upload_path}generated/{filename}'
 
 
-class MemeTemplate(models.Model):
+class RatingMixin:
+    """
+    Mixin providing rating functionality.
+    
+    Classes using this mixin should have:
+    - rating_sum: IntegerField for sum of all ratings
+    - rating_count: IntegerField for number of ratings
+    """
+    
+    def get_average_rating(self):
+        """Calculate and return the average rating (0-5)."""
+        if self.rating_count == 0:
+            return 0
+        return round(self.rating_sum / self.rating_count, 1)
+    
+    def get_rating_display(self):
+        """Return rating as a display string."""
+        avg = self.get_average_rating()
+        if self.rating_count == 0:
+            return "No ratings yet"
+        return f"{avg}/5 ({self.rating_count} vote{'s' if self.rating_count != 1 else ''})"
+    
+    def add_rating(self, stars):
+        """
+        Add a new rating.
+        
+        Args:
+            stars: Integer 1-5
+        
+        Returns:
+            The new average rating
+        """
+        if not 1 <= stars <= 5:
+            raise ValueError("Rating must be between 1 and 5")
+        
+        self.rating_sum += stars
+        self.rating_count += 1
+        self.save(update_fields=['rating_sum', 'rating_count'])
+        return self.get_average_rating()
+    
+    def update_rating(self, old_stars, new_stars):
+        """
+        Update an existing rating.
+        
+        Args:
+            old_stars: The previous rating value
+            new_stars: The new rating value
+        
+        Returns:
+            The new average rating
+        """
+        if not 1 <= new_stars <= 5:
+            raise ValueError("Rating must be between 1 and 5")
+        
+        self.rating_sum = self.rating_sum - old_stars + new_stars
+        self.save(update_fields=['rating_sum', 'rating_count'])
+        return self.get_average_rating()
+
+
+class MemeTemplate(RatingMixin, models.Model):
     """
     A reusable meme template image.
     
@@ -77,6 +144,17 @@ class MemeTemplate(models.Model):
         blank=True,
         help_text="Comma-separated tags for searching (e.g., 'funny, reaction, cat')"
     )
+    
+    # Rating fields
+    rating_sum = models.PositiveIntegerField(
+        default=0,
+        help_text="Sum of all ratings (for calculating average)"
+    )
+    rating_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of ratings received"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -102,18 +180,51 @@ class MemeTemplate(models.Model):
         self.tags = ', '.join(tags_list)
     
     @classmethod
-    def search(cls, query):
+    def search(cls, query, order_by=None):
         """
         Search templates by title and tags.
         Uses icontains for database-agnostic case-insensitive search.
-        """
-        if not query:
-            return cls.objects.all()
         
-        from django.db.models import Q
-        return cls.objects.filter(
-            Q(title__icontains=query) | Q(tags__icontains=query)
-        ).distinct()
+        Args:
+            query: Search string
+            order_by: Optional ordering ('rating', '-rating', 'created', '-created', 'title')
+        """
+        if query:
+            from django.db.models import Q
+            qs = cls.objects.filter(
+                Q(title__icontains=query) | Q(tags__icontains=query)
+            ).distinct()
+        else:
+            qs = cls.objects.all()
+        
+        # Apply ordering
+        if order_by == 'rating' or order_by == '-rating':
+            # Order by average rating (rating_sum / rating_count)
+            # Handle division by zero by using Case/When
+            from django.db.models import Case, When, F, FloatField, Value
+            from django.db.models.functions import Cast
+            
+            qs = qs.annotate(
+                avg_rating=Case(
+                    When(rating_count=0, then=Value(0.0)),
+                    default=Cast(F('rating_sum'), FloatField()) / Cast(F('rating_count'), FloatField()),
+                    output_field=FloatField()
+                )
+            )
+            if order_by == '-rating':
+                qs = qs.order_by('-avg_rating', '-rating_count', '-created_at')
+            else:
+                qs = qs.order_by('avg_rating', 'rating_count', 'created_at')
+        elif order_by == 'created':
+            qs = qs.order_by('created_at')
+        elif order_by == '-created':
+            qs = qs.order_by('-created_at')
+        elif order_by == 'title':
+            qs = qs.order_by('title')
+        elif order_by == '-title':
+            qs = qs.order_by('-title')
+        
+        return qs
     
     def delete(self, *args, **kwargs):
         """Override delete to also remove the image file from storage."""
@@ -126,7 +237,7 @@ class MemeTemplate(models.Model):
                 pass
 
 
-class Meme(models.Model):
+class Meme(RatingMixin, models.Model):
     """
     A user-created meme based on a template.
     
@@ -196,6 +307,16 @@ class Meme(models.Model):
         null=True,
         blank=True,
         help_text="The final rendered meme image"
+    )
+    
+    # Rating fields
+    rating_sum = models.PositiveIntegerField(
+        default=0,
+        help_text="Sum of all ratings (for calculating average)"
+    )
+    rating_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of ratings received"
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -297,25 +418,24 @@ class Meme(models.Model):
         
         return result
     
-    def generate_image(self, save=True):
+    def generate_image(self):
         """
         Generate the composite meme image using Pillow.
         
         This creates a new image with text overlays burned in.
         The generated image is saved to the generated_image field.
         
-        Returns True if successful, False otherwise.
+        Returns the filename if successful, None otherwise.
         """
         try:
             from PIL import Image, ImageDraw, ImageFont
-            import os
         except ImportError:
             # Pillow not available, skip generation
-            return False
+            return None
         
         source_image = self.get_source_image()
         if not source_image:
-            return False
+            return None
         
         try:
             # Open the source image
@@ -337,7 +457,8 @@ class Meme(models.Model):
                         'position': 'top',
                         'color': '#FFFFFF',
                         'stroke_color': '#000000',
-                        'uppercase': True
+                        'uppercase': True,
+                        'font_size': 48,
                     })
                 if self.bottom_text:
                     overlays.append({
@@ -345,21 +466,27 @@ class Meme(models.Model):
                         'position': 'bottom',
                         'color': '#FFFFFF',
                         'stroke_color': '#000000',
-                        'uppercase': True
+                        'uppercase': True,
+                        'font_size': 48,
                     })
             
-            # Try to load Impact font, fall back to default
-            font_size = max(int(width / 10), 24)
-            try:
-                font = ImageFont.truetype("Impact", font_size)
-            except (IOError, OSError):
-                try:
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Impact.ttf", font_size)
-                except (IOError, OSError):
+            # Font loading helper
+            def load_font(size):
+                """Try to load Impact font at given size, fall back to default."""
+                font_paths = [
+                    "Impact",
+                    "/System/Library/Fonts/Supplemental/Impact.ttf",  # macOS
+                    "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",  # Linux
+                    "/usr/share/fonts/TTF/impact.ttf",  # Arch Linux
+                    "C:\\Windows\\Fonts\\impact.ttf",  # Windows
+                ]
+                for font_path in font_paths:
                     try:
-                        font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Impact.ttf", font_size)
+                        return ImageFont.truetype(font_path, size)
                     except (IOError, OSError):
-                        font = ImageFont.load_default()
+                        continue
+                # Fall back to default font
+                return ImageFont.load_default()
             
             for overlay in overlays:
                 text = overlay.get('text', '')
@@ -368,6 +495,15 @@ class Meme(models.Model):
                 
                 if overlay.get('uppercase', True):
                     text = text.upper()
+                
+                # Get user-specified font size, scale it relative to image width
+                # User's font size is based on ~800px preview, scale to actual image
+                user_font_size = overlay.get('font_size') or 48  # Handle None values
+                scale_factor = width / 800.0
+                font_size = max(16, int(user_font_size * scale_factor))
+                
+                # Load font at the correct size for this overlay
+                font = load_font(font_size)
                 
                 # Calculate position
                 position = overlay.get('position', 'top')
@@ -380,53 +516,153 @@ class Meme(models.Model):
                 x = (width - text_width) // 2
                 
                 if position == 'top':
-                    y = int(height * 0.05)
+                    y = int(height * 0.03)
                 elif position == 'bottom':
-                    y = height - text_height - int(height * 0.05)
+                    y = height - text_height - int(height * 0.03)
                 else:
                     x = int(width * overlay.get('x', 50) / 100) - text_width // 2
                     y = int(height * overlay.get('y', 50) / 100) - text_height // 2
                 
                 # Draw text with stroke
-                stroke_color = overlay.get('stroke_color', '#000000')
-                text_color = overlay.get('color', '#FFFFFF')
-                stroke_width = overlay.get('stroke_width', 2)
+                stroke_color = overlay.get('stroke_color') or '#000000'  # Handle empty/None
+                text_color = overlay.get('color') or '#FFFFFF'  # Handle empty/None
+                # Scale stroke width with font size
+                stroke_width = max(2, int(font_size / 16))
                 
-                # Draw stroke (outline)
+                # Draw stroke (outline) - use a more efficient method
                 for dx in range(-stroke_width, stroke_width + 1):
                     for dy in range(-stroke_width, stroke_width + 1):
-                        if dx != 0 or dy != 0:
+                        if dx * dx + dy * dy <= stroke_width * stroke_width:
                             draw.text((x + dx, y + dy), text, font=font, fill=stroke_color)
                 
                 # Draw main text
                 draw.text((x, y), text, font=font, fill=text_color)
             
+            # Apply watermark if configured
+            img = self._apply_watermark(img)
+            
             # Save to buffer
             buffer = io.BytesIO()
-            img_format = 'PNG' if img.mode == 'RGBA' else 'JPEG'
-            img.save(buffer, format=img_format, quality=95)
+            # Convert to RGB for JPEG (no alpha channel)
+            if img.mode == 'RGBA':
+                # Create white background
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[3])  # 3 is the alpha channel
+                img = background
+            
+            img.save(buffer, format='JPEG', quality=95)
             buffer.seek(0)
             
             # Generate filename
-            ext = 'png' if img_format == 'PNG' else 'jpg'
-            filename = f"meme_{self.pk or uuid.uuid4().hex}_{uuid.uuid4().hex[:8]}.{ext}"
+            filename = f"meme_{self.pk or uuid.uuid4().hex}_{uuid.uuid4().hex[:8]}.jpg"
             
-            # Save to field
-            self.generated_image.save(filename, ContentFile(buffer.read()), save=save)
-            
-            return True
+            # Return the filename and content for the caller to save
+            return (filename, ContentFile(buffer.read()))
             
         except Exception as e:
             # Log error but don't fail
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to generate meme image: {e}")
-            return False
+            import traceback
+            logger.warning(traceback.format_exc())
+            return None
+    
+    def _apply_watermark(self, img):
+        """
+        Apply watermark to the image if WATERMARK_IMAGE is configured.
+        
+        The watermark is placed in the bottom-right corner with configurable
+        opacity, scale, and padding.
+        
+        Args:
+            img: PIL Image object (RGBA mode)
+            
+        Returns:
+            PIL Image object with watermark applied (or unchanged if no watermark)
+        """
+        from PIL import Image
+        import os
+        
+        watermark_path = meme_maker_settings.WATERMARK_IMAGE
+        if not watermark_path:
+            return img
+        
+        try:
+            # Try to find the watermark file
+            watermark_img = None
+            
+            # If it's an absolute path, use it directly
+            if os.path.isabs(watermark_path) and os.path.exists(watermark_path):
+                watermark_img = Image.open(watermark_path)
+            else:
+                # Try to find in static files
+                from django.contrib.staticfiles import finders
+                found_path = finders.find(watermark_path)
+                if found_path:
+                    watermark_img = Image.open(found_path)
+                else:
+                    # Try relative to BASE_DIR if available
+                    from django.conf import settings as django_settings
+                    if hasattr(django_settings, 'BASE_DIR'):
+                        full_path = os.path.join(django_settings.BASE_DIR, watermark_path)
+                        if os.path.exists(full_path):
+                            watermark_img = Image.open(full_path)
+            
+            if not watermark_img:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Watermark image not found: {watermark_path}")
+                return img
+            
+            # Ensure watermark has alpha channel
+            watermark_img = watermark_img.convert('RGBA')
+            
+            # Get settings
+            opacity = meme_maker_settings.WATERMARK_OPACITY
+            scale = meme_maker_settings.WATERMARK_SCALE
+            padding = meme_maker_settings.WATERMARK_PADDING
+            
+            # Calculate new watermark size (based on meme width)
+            img_width, img_height = img.size
+            wm_width, wm_height = watermark_img.size
+            
+            # Scale watermark to be a percentage of the meme width
+            new_wm_width = int(img_width * scale)
+            aspect_ratio = wm_height / wm_width
+            new_wm_height = int(new_wm_width * aspect_ratio)
+            
+            # Resize watermark
+            watermark_img = watermark_img.resize(
+                (new_wm_width, new_wm_height), 
+                Image.LANCZOS
+            )
+            
+            # Apply opacity to watermark
+            if opacity < 1.0:
+                # Adjust alpha channel
+                r, g, b, a = watermark_img.split()
+                a = a.point(lambda x: int(x * opacity))
+                watermark_img = Image.merge('RGBA', (r, g, b, a))
+            
+            # Calculate position (bottom-right with padding)
+            x = img_width - new_wm_width - padding
+            y = img_height - new_wm_height - padding
+            
+            # Composite watermark onto image
+            img.paste(watermark_img, (x, y), watermark_img)
+            
+            return img
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to apply watermark: {e}")
+            return img
     
     def save(self, *args, **kwargs):
         """Override save to generate the composite image."""
         # First save to get a PK if new
-        is_new = self.pk is None
         super().save(*args, **kwargs)
         
         # Generate composite image
@@ -438,13 +674,21 @@ class Meme(models.Model):
         ) and self.get_source_image()
         
         if should_generate:
-            # Generate but don't trigger another save loop
-            self.generate_image(save=False)
-            # Update just the generated_image field
-            if self.generated_image:
-                Meme.objects.filter(pk=self.pk).update(
-                    generated_image=self.generated_image
-                )
+            result = self.generate_image()
+            if result:
+                filename, content = result
+                # Save the generated image directly to storage
+                # and update the field using a direct DB update to avoid recursion
+                from django.core.files.storage import default_storage
+                
+                # Determine the full path
+                upload_path = meme_upload_path(self, filename)
+                
+                # Save to storage
+                saved_path = default_storage.save(upload_path, content)
+                
+                # Update the model field directly in DB
+                Meme.objects.filter(pk=self.pk).update(generated_image=saved_path)
     
     def delete(self, *args, **kwargs):
         """Override delete to also remove image files from storage."""
@@ -459,3 +703,69 @@ class Meme(models.Model):
                     default_storage.delete(path)
                 except Exception:
                     pass
+
+
+# =============================================================================
+# RATING TRACKING MODELS
+# =============================================================================
+
+class TemplateRating(models.Model):
+    """
+    Tracks individual ratings for templates.
+    
+    Uses session key to prevent duplicate ratings without requiring authentication.
+    """
+    template = models.ForeignKey(
+        MemeTemplate,
+        on_delete=models.CASCADE,
+        related_name='ratings'
+    )
+    session_key = models.CharField(
+        max_length=40,
+        help_text="Session key to track who rated"
+    )
+    stars = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Rating value 1-5"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('template', 'session_key')
+        verbose_name = 'Template Rating'
+        verbose_name_plural = 'Template Ratings'
+    
+    def __str__(self):
+        return f"{self.template.title} - {self.stars} stars"
+
+
+class MemeRating(models.Model):
+    """
+    Tracks individual ratings for memes.
+    
+    Uses session key to prevent duplicate ratings without requiring authentication.
+    """
+    meme = models.ForeignKey(
+        Meme,
+        on_delete=models.CASCADE,
+        related_name='ratings'
+    )
+    session_key = models.CharField(
+        max_length=40,
+        help_text="Session key to track who rated"
+    )
+    stars = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Rating value 1-5"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('meme', 'session_key')
+        verbose_name = 'Meme Rating'
+        verbose_name_plural = 'Meme Ratings'
+    
+    def __str__(self):
+        return f"Meme #{self.meme.pk} - {self.stars} stars"
