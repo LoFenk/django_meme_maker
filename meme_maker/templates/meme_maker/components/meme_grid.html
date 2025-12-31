@@ -1,0 +1,37 @@
+{#
+Embeddable Meme Grid Component
+==============================
+
+This component displays a grid of meme cards.
+
+Usage:
+    {% include "meme_maker/components/meme_grid.html" with memes=memes %}
+
+Required context:
+    - memes: A queryset or list of Meme instances
+
+Optional context:
+    - show_empty: Whether to show empty state (default: True)
+    - empty_message: Custom empty state message
+    - max_items: Maximum number of items to show (default: all)
+#}
+
+{% if memes %}
+<div class="meme-grid">
+    {% for meme in memes %}
+        {% if forloop.counter <= max_items|default:999 %}
+        {% include "meme_maker/components/meme_card.html" with meme=meme %}
+        {% endif %}
+    {% endfor %}
+</div>
+{% elif show_empty|default:True %}
+<div class="meme-empty">
+    <div class="meme-empty-icon">🎨</div>
+    <h2 class="meme-empty-title">{{ empty_title|default:"No memes yet!" }}</h2>
+    <p class="meme-empty-text">{{ empty_message|default:"Create your first meme to get started." }}</p>
+    <a href="{% url 'meme_maker:create' %}" class="meme-btn">
+        Create Your First Meme →
+    </a>
+</div>
+{% endif %}
+

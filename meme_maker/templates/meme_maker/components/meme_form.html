@@ -1,0 +1,62 @@
+{# 
+Embeddable Meme Form Component
+==============================
+
+This component can be included in any template to embed the meme creation form.
+
+Usage:
+    {% include "meme_maker/components/meme_form.html" with form=form %}
+
+Required context:
+    - form: A MemeForm instance
+
+Optional context:
+    - show_labels: Whether to show form labels (default: True)
+    - button_text: Custom button text (default: "Create Meme →")
+    - button_class: Additional button classes
+#}
+
+<form method="post" enctype="multipart/form-data" class="meme-form">
+    {% csrf_token %}
+    
+    <div class="meme-form-group">
+        {% if show_labels|default:True %}
+        <label for="{{ form.image.id_for_label }}" class="meme-form-label">
+            {{ form.image.label }}
+        </label>
+        {% endif %}
+        {{ form.image }}
+        {% if form.image.errors %}
+        <p class="meme-form-error">{{ form.image.errors.0 }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="meme-form-group">
+        {% if show_labels|default:True %}
+        <label for="{{ form.top_text.id_for_label }}" class="meme-form-label">
+            {{ form.top_text.label }}
+        </label>
+        {% endif %}
+        {{ form.top_text }}
+        {% if form.top_text.errors %}
+        <p class="meme-form-error">{{ form.top_text.errors.0 }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="meme-form-group">
+        {% if show_labels|default:True %}
+        <label for="{{ form.bottom_text.id_for_label }}" class="meme-form-label">
+            {{ form.bottom_text.label }}
+        </label>
+        {% endif %}
+        {{ form.bottom_text }}
+        {% if form.bottom_text.errors %}
+        <p class="meme-form-error">{{ form.bottom_text.errors.0 }}</p>
+        {% endif %}
+    </div>
+    
+    <button type="submit" class="meme-btn meme-btn-full {{ button_class }}">
+        {{ button_text|default:"Create Meme →" }}
+    </button>
+</form>
+
