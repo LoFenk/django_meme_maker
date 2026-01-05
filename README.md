@@ -15,6 +15,7 @@ A reusable Django app for creating and managing memes with a searchable template
 - 🖼️ **Image Generation** - Automatic composite image generation with Pillow
 - 💧 **Watermark Support** - Add your logo/watermark to all generated memes
 - ⭐ **Rating System** - Rate templates and memes with star ratings
+- 🔗 **Object Linking** - Link memes/templates to any model (Users, Products, etc.)
 - 💾 **Storage agnostic** - Works with any Django storage backend (local, S3, GCS, etc.)
 - 📦 **Embeddable components** - Include meme functionality in any template
 - 🔌 **Plug and play** - Simple installation with sensible defaults
@@ -441,8 +442,79 @@ MEME_MAKER = {
 
 Both models are registered with the Django admin:
 
-- **MemeTemplate Admin**: Preview, search by title/tags, view meme count
-- **Meme Admin**: Preview, template info, regenerate images action
+- **MemeTemplate Admin**: Preview, search by title/tags, view meme count, view linked objects
+- **Meme Admin**: Preview, template info, regenerate images action, view linked objects
+- **TemplateLink / MemeLink Admin**: Manage object links directly
+
+## Object Linking
+
+Link memes and templates to **any object** in your project (Users, Products, Campaigns, etc.) using Django's ContentTypes framework.
+
+### Linking Objects
+
+```python
+from myapp.models import Product, Campaign
+from meme_maker.models import Meme, MemeTemplate
+
+# Link a meme to multiple objects
+meme = Meme.objects.get(pk=1)
+meme.link_to(product)
+meme.link_to(user)
+meme.link_to(campaign)
+
+# Link with optional metadata
+meme.link_to(product, link_type='featured')
+meme.link_to(user, link_type='created_by', metadata={'source': 'api'})
+
+# Same for templates
+template = MemeTemplate.objects.get(pk=1)
+template.link_to(brand)
+template.link_to(category)
+```
+
+### Checking Links
+
+```python
+# Check if linked
+meme.is_linked_to(product)  # True/False
+
+# Get all linked objects
+meme.get_linked_objects()  # [<Product>, <User>, <Campaign>]
+
+# Get linked objects of a specific type
+meme.get_linked_objects(Product)  # [<Product>]
+
+# Get link instances (to access link_type and metadata)
+links = meme.get_links()
+for link in links:
+    print(f"{link.linked_object} - {link.link_type}")
+```
+
+### Unlinking
+
+```python
+meme.unlink_from(product)  # Returns True if removed, False if didn't exist
+```
+
+### Querying by Linked Object
+
+```python
+# Get all memes linked to a product
+memes = Meme.objects.linked_to(product)
+
+# Get all templates linked to a campaign
+templates = MemeTemplate.objects.linked_to(campaign)
+
+# Combine with other filters
+recent_memes = Meme.objects.linked_to(user).filter(created_at__gte=last_week)
+```
+
+### Use Cases
+
+- **User ownership**: `meme.link_to(request.user, link_type='created_by')`
+- **Product association**: `meme.link_to(product, link_type='promotional')`
+- **Campaign tracking**: `template.link_to(campaign, link_type='source')`
+- **Content curation**: `template.link_to(collection, link_type='featured')`
 
 ## Development
 

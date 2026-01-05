@@ -1,12 +1,12 @@
 """
 Admin configuration for django-meme-maker.
 
-Provides admin interfaces for MemeTemplate and Meme models.
+Provides admin interfaces for MemeTemplate, Meme, and Link models.
 """
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import MemeTemplate, Meme
+from .models import MemeTemplate, Meme, TemplateLink, MemeLink
 
 
 @admin.register(MemeTemplate)
@@ -171,3 +171,98 @@ class MemeAdmin(admin.ModelAdmin):
             request,
             f'Successfully regenerated {count} of {queryset.count()} meme images.'
         )
+
+
+# =============================================================================
+# LINK ADMIN CLASSES
+# =============================================================================
+
+class TemplateLinkInline(admin.TabularInline):
+    """Inline admin for template links - shown on MemeTemplate detail page."""
+    model = TemplateLink
+    extra = 0
+    readonly_fields = ['content_type', 'object_id', 'linked_object_display', 'link_type', 'created_at']
+    fields = ['content_type', 'object_id', 'linked_object_display', 'link_type', 'created_at']
+    
+    def linked_object_display(self, obj):
+        """Display the linked object."""
+        if obj.linked_object:
+            return str(obj.linked_object)
+        return f"{obj.content_type.model}:{obj.object_id}"
+    linked_object_display.short_description = 'Linked To'
+    
+    def has_add_permission(self, request, obj=None):
+        return False  # Links should be created programmatically
+
+
+class MemeLinkInline(admin.TabularInline):
+    """Inline admin for meme links - shown on Meme detail page."""
+    model = MemeLink
+    extra = 0
+    readonly_fields = ['content_type', 'object_id', 'linked_object_display', 'link_type', 'created_at']
+    fields = ['content_type', 'object_id', 'linked_object_display', 'link_type', 'created_at']
+    
+    def linked_object_display(self, obj):
+        """Display the linked object."""
+        if obj.linked_object:
+            return str(obj.linked_object)
+        return f"{obj.content_type.model}:{obj.object_id}"
+    linked_object_display.short_description = 'Linked To'
+    
+    def has_add_permission(self, request, obj=None):
+        return False  # Links should be created programmatically
+
+
+@admin.register(TemplateLink)
+class TemplateLinkAdmin(admin.ModelAdmin):
+    """Admin interface for template links."""
+    
+    list_display = ['id', 'template', 'content_type', 'object_id', 'link_type', 'created_at']
+    list_filter = ['content_type', 'link_type', 'created_at']
+    search_fields = ['template__title', 'link_type']
+    readonly_fields = ['created_at']
+    raw_id_fields = ['template']
+    
+    fieldsets = (
+        (None, {
+            'fields': ('template', 'content_type', 'object_id', 'link_type')
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+        ('Info', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(MemeLink)
+class MemeLinkAdmin(admin.ModelAdmin):
+    """Admin interface for meme links."""
+    
+    list_display = ['id', 'meme', 'content_type', 'object_id', 'link_type', 'created_at']
+    list_filter = ['content_type', 'link_type', 'created_at']
+    search_fields = ['meme__top_text', 'meme__bottom_text', 'link_type']
+    readonly_fields = ['created_at']
+    raw_id_fields = ['meme']
+    
+    fieldsets = (
+        (None, {
+            'fields': ('meme', 'content_type', 'object_id', 'link_type')
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+        ('Info', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+# Add inlines to the main admin classes
+MemeTemplateAdmin.inlines = [TemplateLinkInline]
+MemeAdmin.inlines = [MemeLinkInline]
