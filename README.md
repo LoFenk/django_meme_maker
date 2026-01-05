@@ -113,6 +113,7 @@ MEME_MAKER = {
     'UPLOAD_PATH': 'memes/',
     
     # Base template to extend (for embedding into your site's layout)
+    # NOTE: Your base template MUST have {% block content %}{% endblock %}
     'BASE_TEMPLATE': 'meme_maker/base.html',
     
     # Primary theme color
@@ -297,6 +298,11 @@ MEME_MAKER = {
     'BASE_TEMPLATE': 'your_app/base.html',
     'EMBED_MODE': True,
 }
+
+# Your base template must have a {% block content %} where meme maker will inject its pages:
+# <body>
+#     {% block content %}{% endblock %}
+# </body>
 ```
 
 ### Option 3: Include Components in Your Templates

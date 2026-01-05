@@ -3,7 +3,7 @@
 {% block header_title %}Template Bank{% endblock %}
 {% block header_subtitle %}Search and browse meme templates{% endblock %}
 
-{% block meme_maker_content %}
+{% block content %}
 {# Search Form #}
 <form method="get" action="{% url 'meme_maker:template_list' %}" class="meme-search-bar">
     <input type="text" 
@@ -113,5 +113,5 @@ function updateSort(value) {
     </a>
 </div>
 {% endif %}
-{% endblock %}
+{% endblock content %}
 

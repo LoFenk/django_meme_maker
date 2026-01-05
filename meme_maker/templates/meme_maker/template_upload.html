@@ -3,7 +3,7 @@
 {% block header_title %}Upload Template{% endblock %}
 {% block header_subtitle %}Add a new meme template to the bank{% endblock %}
 
-{% block meme_maker_content %}
+{% block content %}
 <form method="post" enctype="multipart/form-data" class="meme-form" style="max-width: 600px; margin: 0 auto;">
     {% csrf_token %}
     
