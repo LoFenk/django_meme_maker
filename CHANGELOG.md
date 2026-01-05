@@ -5,6 +5,16 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-01-05
+
+### Added
+- **CSP Nonce Support**: Templates now check for `CSP_NONCE` context variable
+- Automatic nonce attributes on script/style tags when using django-csp
+- CSP documentation section in README
+
+### Changed
+- Script and style tags now include `{% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}`
+
 ## [1.2.0] - 2026-01-05
 
 ### Changed
@@ -12,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSS now served from `meme_maker/static/meme_maker/css/meme_maker.css`
 - Rating JS moved to `meme_maker/static/meme_maker/js/rating.js`
 - Editor JS moved to `meme_maker/static/meme_maker/js/editor.js`
+- Sort utility JS added to `meme_maker/static/meme_maker/js/utils.js`
 - Simplified and consolidated CSS (reduced from ~650 lines inline to ~180 lines)
 - Only dynamic CSS variables (colors) remain inline when customized
 
