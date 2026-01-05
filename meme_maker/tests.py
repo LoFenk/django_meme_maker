@@ -18,7 +18,10 @@ from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.files.base import ContentFile
 
-from .models import MemeTemplate, Meme
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth.models import User
+
+from .models import MemeTemplate, Meme, TemplateLink, MemeLink
 from .forms import MemeTemplateForm, MemeEditorForm, MemeForm, MemeTemplateSearchForm
 
 
@@ -1445,3 +1448,259 @@ class URLRatingTests(TestCase):
         """Test rate meme URL resolves."""
         url = reverse('meme_maker:rate_meme', kwargs={'pk': 1})
         self.assertEqual(url, '/meme/1/rate/')
+
+
+# =============================================================================
+# OBJECT LINKING TESTS
+# =============================================================================
+
+class TemplateLinkingTests(TestCase):
+    """Tests for the template object linking functionality."""
+    
+    def setUp(self):
+        """Create test data."""
+        self.template = MemeTemplate.objects.create(
+            title='Test Template',
+            tags='test, linking',
+            image=SimpleUploadedFile(
+                'test.png',
+                create_test_image().read(),
+                content_type='image/png'
+            )
+        )
+        # Create a User to link to (using Django's built-in User model)
+        self.user1 = User.objects.create_user(username='testuser1', password='testpass')
+        self.user2 = User.objects.create_user(username='testuser2', password='testpass')
+    
+    def test_link_to_object(self):
+        """Test linking a template to an object."""
+        link = self.template.link_to(self.user1)
+        
+        self.assertIsNotNone(link)
+        self.assertEqual(link.template, self.template)
+        self.assertEqual(link.linked_object, self.user1)
+    
+    def test_link_to_multiple_objects(self):
+        """Test linking a template to multiple objects."""
+        self.template.link_to(self.user1)
+        self.template.link_to(self.user2)
+        
+        linked_objects = self.template.get_linked_objects()
+        self.assertEqual(len(linked_objects), 2)
+        self.assertIn(self.user1, linked_objects)
+        self.assertIn(self.user2, linked_objects)
+    
+    def test_link_to_same_object_twice(self):
+        """Test that linking to the same object twice doesn't create duplicates."""
+        link1 = self.template.link_to(self.user1)
+        link2 = self.template.link_to(self.user1)
+        
+        self.assertEqual(link1.pk, link2.pk)  # Same link returned
+        self.assertEqual(self.template.object_links.count(), 1)
+    
+    def test_is_linked_to(self):
+        """Test checking if template is linked to an object."""
+        self.assertFalse(self.template.is_linked_to(self.user1))
+        
+        self.template.link_to(self.user1)
+        
+        self.assertTrue(self.template.is_linked_to(self.user1))
+        self.assertFalse(self.template.is_linked_to(self.user2))
+    
+    def test_unlink_from_object(self):
+        """Test unlinking a template from an object."""
+        self.template.link_to(self.user1)
+        self.assertTrue(self.template.is_linked_to(self.user1))
+        
+        result = self.template.unlink_from(self.user1)
+        
+        self.assertTrue(result)
+        self.assertFalse(self.template.is_linked_to(self.user1))
+    
+    def test_unlink_from_unlinked_object(self):
+        """Test unlinking from an object that wasn't linked."""
+        result = self.template.unlink_from(self.user1)
+        self.assertFalse(result)
+    
+    def test_get_linked_objects_filtered_by_type(self):
+        """Test getting linked objects filtered by model type."""
+        # Create another template to link to (different model type)
+        other_template = MemeTemplate.objects.create(
+            title='Other Template',
+            image=SimpleUploadedFile(
+                'other.png',
+                create_test_image().read(),
+                content_type='image/png'
+            )
+        )
+        
+        self.template.link_to(self.user1)
+        self.template.link_to(other_template)
+        
+        # Get only User links
+        users = self.template.get_linked_objects(User)
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0], self.user1)
+        
+        # Get only MemeTemplate links
+        templates = self.template.get_linked_objects(MemeTemplate)
+        self.assertEqual(len(templates), 1)
+        self.assertEqual(templates[0], other_template)
+    
+    def test_link_with_link_type(self):
+        """Test linking with a link_type metadata."""
+        link = self.template.link_to(self.user1, link_type='created_by')
+        
+        self.assertEqual(link.link_type, 'created_by')
+    
+    def test_manager_linked_to(self):
+        """Test querying templates by linked object using the manager."""
+        template2 = MemeTemplate.objects.create(
+            title='Another Template',
+            image=SimpleUploadedFile(
+                'another.png',
+                create_test_image().read(),
+                content_type='image/png'
+            )
+        )
+        
+        self.template.link_to(self.user1)
+        template2.link_to(self.user2)
+        
+        # Query by user1
+        templates_for_user1 = MemeTemplate.objects.linked_to(self.user1)
+        self.assertEqual(templates_for_user1.count(), 1)
+        self.assertEqual(templates_for_user1.first(), self.template)
+        
+        # Query by user2
+        templates_for_user2 = MemeTemplate.objects.linked_to(self.user2)
+        self.assertEqual(templates_for_user2.count(), 1)
+        self.assertEqual(templates_for_user2.first(), template2)
+
+
+class MemeLinkingTests(TestCase):
+    """Tests for the meme object linking functionality."""
+    
+    def setUp(self):
+        """Create test data."""
+        self.template = MemeTemplate.objects.create(
+            title='Test Template',
+            image=SimpleUploadedFile(
+                'test.png',
+                create_test_image().read(),
+                content_type='image/png'
+            )
+        )
+        self.meme = Meme.objects.create(
+            template=self.template,
+            top_text='Hello',
+            bottom_text='World'
+        )
+        self.user1 = User.objects.create_user(username='memeuser1', password='testpass')
+        self.user2 = User.objects.create_user(username='memeuser2', password='testpass')
+    
+    def test_link_meme_to_object(self):
+        """Test linking a meme to an object."""
+        link = self.meme.link_to(self.user1)
+        
+        self.assertIsNotNone(link)
+        self.assertEqual(link.meme, self.meme)
+        self.assertEqual(link.linked_object, self.user1)
+    
+    def test_meme_link_to_multiple_objects(self):
+        """Test linking a meme to multiple objects."""
+        self.meme.link_to(self.user1)
+        self.meme.link_to(self.user2)
+        
+        linked_objects = self.meme.get_linked_objects()
+        self.assertEqual(len(linked_objects), 2)
+    
+    def test_meme_is_linked_to(self):
+        """Test checking if meme is linked to an object."""
+        self.assertFalse(self.meme.is_linked_to(self.user1))
+        
+        self.meme.link_to(self.user1)
+        
+        self.assertTrue(self.meme.is_linked_to(self.user1))
+    
+    def test_meme_unlink_from_object(self):
+        """Test unlinking a meme from an object."""
+        self.meme.link_to(self.user1)
+        self.assertTrue(self.meme.is_linked_to(self.user1))
+        
+        self.meme.unlink_from(self.user1)
+        
+        self.assertFalse(self.meme.is_linked_to(self.user1))
+    
+    def test_meme_manager_linked_to(self):
+        """Test querying memes by linked object using the manager."""
+        meme2 = Meme.objects.create(
+            template=self.template,
+            top_text='Another',
+            bottom_text='Meme'
+        )
+        
+        self.meme.link_to(self.user1)
+        meme2.link_to(self.user2)
+        
+        memes_for_user1 = Meme.objects.linked_to(self.user1)
+        self.assertEqual(memes_for_user1.count(), 1)
+        self.assertEqual(memes_for_user1.first(), self.meme)
+    
+    def test_link_with_metadata(self):
+        """Test linking with additional metadata."""
+        metadata = {'context': 'marketing', 'campaign_id': 123}
+        link = self.meme.link_to(self.user1, link_type='featured', metadata=metadata)
+        
+        self.assertEqual(link.link_type, 'featured')
+        self.assertEqual(link.metadata, metadata)
+    
+    def test_get_links_returns_link_objects(self):
+        """Test getting link objects (not just linked objects)."""
+        self.meme.link_to(self.user1, link_type='created_by')
+        self.meme.link_to(self.user2, link_type='shared_with')
+        
+        links = self.meme.get_links()
+        self.assertEqual(links.count(), 2)
+        
+        link_types = [link.link_type for link in links]
+        self.assertIn('created_by', link_types)
+        self.assertIn('shared_with', link_types)
+
+
+class LinkCascadeDeleteTests(TestCase):
+    """Tests for cascade deletion of links."""
+    
+    def setUp(self):
+        """Create test data."""
+        self.template = MemeTemplate.objects.create(
+            title='Test Template',
+            image=SimpleUploadedFile(
+                'test.png',
+                create_test_image().read(),
+                content_type='image/png'
+            )
+        )
+        self.meme = Meme.objects.create(
+            template=self.template,
+            top_text='Test'
+        )
+        self.user = User.objects.create_user(username='linkuser', password='testpass')
+    
+    def test_template_delete_cascades_to_links(self):
+        """Test that deleting a template deletes its links."""
+        self.template.link_to(self.user)
+        self.assertEqual(TemplateLink.objects.count(), 1)
+        
+        self.template.delete()
+        
+        self.assertEqual(TemplateLink.objects.count(), 0)
+    
+    def test_meme_delete_cascades_to_links(self):
+        """Test that deleting a meme deletes its links."""
+        self.meme.link_to(self.user)
+        self.assertEqual(MemeLink.objects.count(), 1)
+        
+        self.meme.delete()
+        
+        self.assertEqual(MemeLink.objects.count(), 0)

@@ -6,6 +6,8 @@ This module contains the following models:
 - Meme: User-created memes based on templates with text overlays
 - TemplateRating: Star ratings for templates
 - MemeRating: Star ratings for memes
+- TemplateLink: Generic many-to-many linking templates to any object
+- MemeLink: Generic many-to-many linking memes to any object
 
 Image Generation Strategy (IMPORTANT):
 --------------------------------------
@@ -32,6 +34,25 @@ Rating System:
 --------------
 Both templates and memes support 1-5 star ratings. Ratings are tracked per
 session to prevent duplicate voting while not requiring authentication.
+
+Object Linking System:
+----------------------
+Both templates and memes can be linked to ANY object in your project using
+Django's ContentTypes framework. This provides a generic many-to-many relationship.
+
+Usage:
+    # Link to objects
+    meme.link_to(product)
+    meme.link_to(blog_post)
+    template.link_to(campaign)
+    
+    # Query linked objects
+    meme.get_linked_objects()
+    meme.is_linked_to(product)
+    
+    # Query by linked object
+    Meme.objects.linked_to(product)
+    MemeTemplate.objects.linked_to(campaign)
 """
 
 import json
@@ -42,8 +63,181 @@ from django.urls import reverse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 from .conf import meme_maker_settings
+
+
+# =============================================================================
+# CUSTOM MANAGERS WITH LINKING SUPPORT
+# =============================================================================
+
+class LinkableManager(models.Manager):
+    """
+    Custom manager that adds linked_to() queryset method.
+    
+    Usage:
+        Meme.objects.linked_to(my_product)
+        MemeTemplate.objects.linked_to(my_campaign)
+    """
+    
+    def linked_to(self, obj):
+        """
+        Return all instances linked to the given object.
+        
+        Args:
+            obj: Any Django model instance
+            
+        Returns:
+            QuerySet of instances linked to obj
+        """
+        content_type = ContentType.objects.get_for_model(obj)
+        # Get the related link model name (e.g., 'object_links')
+        link_model = self.model._meta.get_field('object_links').related_model
+        linked_ids = link_model.objects.filter(
+            content_type=content_type,
+            object_id=obj.pk
+        ).values_list(self._get_fk_field_name(), flat=True)
+        return self.filter(pk__in=linked_ids)
+    
+    def _get_fk_field_name(self):
+        """Get the FK field name in the link model (meme_id or template_id)."""
+        # This will be overridden by subclasses
+        raise NotImplementedError
+
+
+class MemeManager(LinkableManager):
+    """Manager for Meme model with linking support."""
+    
+    def _get_fk_field_name(self):
+        return 'meme_id'
+
+
+class MemeTemplateManager(LinkableManager):
+    """Manager for MemeTemplate model with linking support."""
+    
+    def _get_fk_field_name(self):
+        return 'template_id'
+
+
+# =============================================================================
+# MIXIN FOR LINKING FUNCTIONALITY
+# =============================================================================
+
+class LinkableMixin:
+    """
+    Mixin providing object linking functionality.
+    
+    Classes using this mixin should have an 'object_links' reverse relation
+    to their corresponding Link model (TemplateLink or MemeLink).
+    """
+    
+    def link_to(self, obj, **extra_fields):
+        """
+        Link this instance to another object.
+        
+        Args:
+            obj: Any Django model instance to link to
+            **extra_fields: Optional extra fields for the link (e.g., link_type, metadata)
+            
+        Returns:
+            The created link instance, or existing one if already linked
+            
+        Example:
+            meme.link_to(product)
+            template.link_to(campaign, link_type='featured')
+        """
+        content_type = ContentType.objects.get_for_model(obj)
+        link_model = self._meta.get_field('object_links').related_model
+        
+        # Get the FK field name for this model
+        fk_field = 'meme' if hasattr(link_model, 'meme') else 'template'
+        
+        link, created = link_model.objects.get_or_create(
+            **{fk_field: self},
+            content_type=content_type,
+            object_id=obj.pk,
+            defaults=extra_fields
+        )
+        return link
+    
+    def unlink_from(self, obj):
+        """
+        Remove link to another object.
+        
+        Args:
+            obj: The object to unlink from
+            
+        Returns:
+            True if link was removed, False if it didn't exist
+        """
+        content_type = ContentType.objects.get_for_model(obj)
+        link_model = self._meta.get_field('object_links').related_model
+        fk_field = 'meme' if hasattr(link_model, 'meme') else 'template'
+        
+        deleted, _ = link_model.objects.filter(
+            **{fk_field: self},
+            content_type=content_type,
+            object_id=obj.pk
+        ).delete()
+        return deleted > 0
+    
+    def is_linked_to(self, obj):
+        """
+        Check if this instance is linked to an object.
+        
+        Args:
+            obj: The object to check
+            
+        Returns:
+            True if linked, False otherwise
+        """
+        content_type = ContentType.objects.get_for_model(obj)
+        return self.object_links.filter(
+            content_type=content_type,
+            object_id=obj.pk
+        ).exists()
+    
+    def get_linked_objects(self, model_class=None):
+        """
+        Get all objects this instance is linked to.
+        
+        Args:
+            model_class: Optional - filter to only return objects of this model type
+            
+        Returns:
+            List of linked objects
+            
+        Example:
+            meme.get_linked_objects()  # All linked objects
+            meme.get_linked_objects(Product)  # Only linked Products
+        """
+        links = self.object_links.all()
+        
+        if model_class:
+            content_type = ContentType.objects.get_for_model(model_class)
+            links = links.filter(content_type=content_type)
+        
+        return [link.linked_object for link in links if link.linked_object]
+    
+    def get_links(self, model_class=None):
+        """
+        Get link instances (for accessing link metadata like link_type).
+        
+        Args:
+            model_class: Optional - filter to only return links to this model type
+            
+        Returns:
+            QuerySet of link instances
+        """
+        links = self.object_links.all()
+        
+        if model_class:
+            content_type = ContentType.objects.get_for_model(model_class)
+            links = links.filter(content_type=content_type)
+        
+        return links
 
 
 def template_upload_path(instance, filename):
@@ -121,12 +315,17 @@ class RatingMixin:
         return self.get_average_rating()
 
 
-class MemeTemplate(RatingMixin, models.Model):
+class MemeTemplate(LinkableMixin, RatingMixin, models.Model):
     """
     A reusable meme template image.
     
     Users can search templates by title and tags, then create memes from them.
     Templates can be uploaded by users or pre-seeded by admins.
+    
+    Linking:
+        template.link_to(campaign)  # Link to any object
+        template.get_linked_objects()  # Get all linked objects
+        MemeTemplate.objects.linked_to(campaign)  # Query by linked object
     """
     image = models.ImageField(
         upload_to=template_upload_path,
@@ -157,6 +356,9 @@ class MemeTemplate(RatingMixin, models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Custom manager with linked_to() support
+    objects = MemeTemplateManager()
     
     class Meta:
         ordering = ['-created_at']
@@ -237,12 +439,18 @@ class MemeTemplate(RatingMixin, models.Model):
                 pass
 
 
-class Meme(RatingMixin, models.Model):
+class Meme(LinkableMixin, RatingMixin, models.Model):
     """
     A user-created meme based on a template.
     
     Stores both the text overlay configuration (as JSON) and a pre-generated
     composite image for fast downloading.
+    
+    Linking:
+        meme.link_to(product)  # Link to any object
+        meme.link_to(user)  # Link to user
+        meme.get_linked_objects()  # Get all linked objects
+        Meme.objects.linked_to(product)  # Query by linked object
     
     Text Overlay JSON Schema:
     {
@@ -321,6 +529,9 @@ class Meme(RatingMixin, models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Custom manager with linked_to() support
+    objects = MemeManager()
     
     class Meta:
         ordering = ['-created_at']
@@ -769,3 +980,127 @@ class MemeRating(models.Model):
     
     def __str__(self):
         return f"Meme #{self.meme.pk} - {self.stars} stars"
+
+
+# =============================================================================
+# OBJECT LINKING MODELS (Generic Many-to-Many)
+# =============================================================================
+
+class TemplateLink(models.Model):
+    """
+    Links a MemeTemplate to any object in your project.
+    
+    This enables a generic many-to-many relationship where templates
+    can be tagged/linked to Products, Campaigns, Users, or any model.
+    
+    Usage:
+        # From the template
+        template.link_to(campaign)
+        template.link_to(brand)
+        template.get_linked_objects()
+        
+        # Query templates by linked object
+        MemeTemplate.objects.linked_to(campaign)
+    """
+    template = models.ForeignKey(
+        MemeTemplate,
+        on_delete=models.CASCADE,
+        related_name='object_links',
+        help_text="The template being linked"
+    )
+    
+    # GenericForeignKey to link to ANY model
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="The type of object being linked to"
+    )
+    object_id = models.PositiveIntegerField(
+        help_text="The ID of the object being linked to"
+    )
+    linked_object = GenericForeignKey('content_type', 'object_id')
+    
+    # Optional metadata for the link
+    link_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Optional: categorize the link (e.g., 'featured', 'owned_by', 'related_to')"
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Optional: additional data about this link"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('template', 'content_type', 'object_id')
+        verbose_name = 'Template Link'
+        verbose_name_plural = 'Template Links'
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.template.title} → {self.content_type.model}:{self.object_id}"
+
+
+class MemeLink(models.Model):
+    """
+    Links a Meme to any object in your project.
+    
+    This enables a generic many-to-many relationship where memes
+    can be tagged/linked to Products, Users, Posts, or any model.
+    
+    Usage:
+        # From the meme
+        meme.link_to(product)
+        meme.link_to(user)
+        meme.get_linked_objects()
+        
+        # Query memes by linked object
+        Meme.objects.linked_to(product)
+    """
+    meme = models.ForeignKey(
+        Meme,
+        on_delete=models.CASCADE,
+        related_name='object_links',
+        help_text="The meme being linked"
+    )
+    
+    # GenericForeignKey to link to ANY model
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="The type of object being linked to"
+    )
+    object_id = models.PositiveIntegerField(
+        help_text="The ID of the object being linked to"
+    )
+    linked_object = GenericForeignKey('content_type', 'object_id')
+    
+    # Optional metadata for the link
+    link_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Optional: categorize the link (e.g., 'created_by', 'featured_in', 'related_to')"
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Optional: additional data about this link"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('meme', 'content_type', 'object_id')
+        verbose_name = 'Meme Link'
+        verbose_name_plural = 'Meme Links'
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+        ]
+    
+    def __str__(self):
+        return f"Meme #{self.meme.pk} → {self.content_type.model}:{self.object_id}"
