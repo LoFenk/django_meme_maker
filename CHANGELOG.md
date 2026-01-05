@@ -5,7 +5,17 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2024-12-13
+## [1.2.0] - 2026-01-05
+
+### Changed
+- **CSP Compliance**: Moved all CSS and JavaScript to static files
+- CSS now served from `meme_maker/static/meme_maker/css/meme_maker.css`
+- Rating JS moved to `meme_maker/static/meme_maker/js/rating.js`
+- Editor JS moved to `meme_maker/static/meme_maker/js/editor.js`
+- Simplified and consolidated CSS (reduced from ~650 lines inline to ~180 lines)
+- Only dynamic CSS variables (colors) remain inline when customized
+
+## [1.1.0] - 2025-12-13
 
 ### Added
 - **Template Bank**: Searchable library of meme templates
