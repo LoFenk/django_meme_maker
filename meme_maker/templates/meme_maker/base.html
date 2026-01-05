@@ -9,7 +9,7 @@
     {% block meme_maker_styles %}
     <link rel="stylesheet" href="{% static 'meme_maker/css/meme_maker.css' %}">
     {% if meme_maker_primary_color or meme_maker_secondary_color or meme_maker_custom_css %}
-    <style>
+    <style {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}>
         :root {
             {% if meme_maker_primary_color %}--meme-primary: {{ meme_maker_primary_color }};{% endif %}
             {% if meme_maker_secondary_color %}--meme-secondary: {{ meme_maker_secondary_color }};{% endif %}
@@ -64,7 +64,8 @@
     </div>
     {% endif %}
     
-    <script src="{% static 'meme_maker/js/rating.js' %}"></script>
+    <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="{% static 'meme_maker/js/utils.js' %}"></script>
+    <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="{% static 'meme_maker/js/rating.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -81,5 +81,5 @@
 
 {% block extra_js %}
 {% load static %}
-<script src="{% static 'meme_maker/js/editor.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="{% static 'meme_maker/js/editor.js' %}"></script>
 {% endblock %}

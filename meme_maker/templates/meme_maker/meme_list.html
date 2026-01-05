@@ -20,14 +20,6 @@
     </span>
 </div>
 
-<script>
-function updateSort(value) {
-    const url = new URL(window.location);
-    url.searchParams.set('order', value);
-    window.location = url;
-}
-</script>
-
 {% if memes %}
 <div class="meme-grid">
     {% for meme in memes %}

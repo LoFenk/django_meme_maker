@@ -101,7 +101,7 @@
     </footer>
     
     <!-- Your site's JavaScript -->
-    <script src="/static/js/main.js"></script>
+    <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="/static/js/main.js"></script>
     
     <!-- This block allows meme maker (and other apps) to inject scripts -->
     {% block extra_js %}{% endblock %}

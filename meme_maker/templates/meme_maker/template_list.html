@@ -37,14 +37,6 @@
     {% endif %}
 </div>
 
-<script>
-function updateSort(value) {
-    const url = new URL(window.location);
-    url.searchParams.set('order', value);
-    window.location = url;
-}
-</script>
-
 {% if templates %}
 <div class="meme-grid">
     {% for template in templates %}

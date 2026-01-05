@@ -444,6 +444,55 @@ MEME_MAKER = {
 }
 ```
 
+## Content Security Policy (CSP)
+
+All JavaScript and CSS are served from static files, making CSP configuration straightforward.
+
+### Basic CSP Configuration
+
+```python
+# For django-csp or similar packages
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'",)
+CSP_STYLE_SRC = ("'self'",)
+CSP_IMG_SRC = ("'self'", "data:")
+```
+
+### If Using django-csp
+
+If you have [django-csp](https://github.com/mozilla/django-csp) installed with nonce support, meme_maker templates will automatically use the `CSP_NONCE` context variable:
+
+```html
+<!-- This is handled automatically in meme_maker templates -->
+<script nonce="{{ CSP_NONCE }}" src="..."></script>
+<style nonce="{{ CSP_NONCE }}">...</style>
+```
+
+No additional configuration needed—just ensure your django-csp middleware is set up.
+
+### If Using Custom Colors (Inline Style)
+
+When you configure `PRIMARY_COLOR`, `SECONDARY_COLOR`, or `CUSTOM_CSS`, a small inline `<style>` block is rendered. Options:
+
+1. **Use django-csp** - Nonce is automatically applied
+2. **Add style hash to CSP** - Calculate hash of the style content
+3. **Use `'unsafe-inline'` for styles** - Less secure but simplest:
+   ```python
+   CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
+   ```
+4. **Skip custom colors** - Use defaults from static CSS file (no inline styles needed)
+
+### If NOT Using django-csp
+
+If you use a different CSP package or manual headers, and need nonces:
+
+1. Ensure your middleware adds `CSP_NONCE` to the template context
+2. Meme_maker templates check for `{% if CSP_NONCE %}` automatically
+
+If your nonce variable has a different name, you'll need to either:
+- Rename it to `CSP_NONCE` in your context processor
+- Override meme_maker templates in your project
+
 ## Admin Interface
 
 Both models are registered with the Django admin:
