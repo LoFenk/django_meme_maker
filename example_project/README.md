@@ -49,7 +49,7 @@ MEME_MAKER = {
 
 Your base template should include blocks that meme maker can use:
 - `{% block title %}` - Page title
-- `{% block content %}` or `{% block meme_maker_content %}` - Main content
+- `{% block content %}` or `{% block content %}` - Main content
 - `{% block extra_head %}` - Additional CSS/JS in head
 - `{% block extra_js %}` - Additional JS at end of body
 
