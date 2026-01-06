@@ -5,6 +5,15 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-01-06
+
+### Changed
+- **Thumbnail display**: Changed from `object-fit: cover` (crop) to `object-fit: contain` (letterbox/pillarbox) for card images
+- Thumbnails now show entire image with grey bars on sides/top-bottom instead of cropping
+
+### Fixed
+- **Storage compatibility**: Removed hardcoded `default_storage` from ImageField definitions to support both local media and S3 storage backends
+
 ## [1.2.3] - 2026-01-06
 
 ### Added
