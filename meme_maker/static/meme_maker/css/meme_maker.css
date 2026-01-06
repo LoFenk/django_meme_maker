@@ -118,7 +118,7 @@
     transition: transform .2s, box-shadow .2s;
 }
 .meme-card:hover { transform: translateY(-4px); box-shadow: var(--meme-shadow); }
-.meme-card-image { width: 100%; height: 200px; object-fit: cover; }
+.meme-card-image { width: 100%; height: 200px; object-fit: contain; background: var(--meme-bg-light); }
 .meme-card-body { padding: 1rem 1.25rem; }
 .meme-card-title { color: var(--meme-text-dark); font-weight: 600; margin: 0 0 .5rem; font-size: 1rem; }
 .meme-card-text { color: var(--meme-text-light); font-size: .875rem; margin: .25rem 0; }

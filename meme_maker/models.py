@@ -329,7 +329,7 @@ class MemeTemplate(LinkableMixin, RatingMixin, models.Model):
     """
     image = models.ImageField(
         upload_to=template_upload_path,
-        storage=default_storage,
+        #storage=default_storage,
         help_text="The template image"
     )
     title = models.CharField(
@@ -485,7 +485,7 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
     # These are kept for existing memes that don't use templates
     image = models.ImageField(
         upload_to=meme_upload_path,
-        storage=default_storage,
+        #storage=default_storage,
         null=True,
         blank=True,
         help_text="Legacy: Direct image upload (use template instead)"
@@ -511,7 +511,7 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
     # Pre-generated composite image for fast downloads
     generated_image = models.ImageField(
         upload_to=meme_upload_path,
-        storage=default_storage,
+        #storage=default_storage,
         null=True,
         blank=True,
         help_text="The final rendered meme image"
