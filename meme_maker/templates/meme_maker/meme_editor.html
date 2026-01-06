@@ -1,4 +1,9 @@
 {% extends meme_maker_base_template|default:"meme_maker/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'meme_maker/css/meme_maker.css' %}">
+{% endblock %}
 
 {% block header_title %}Create Meme{% endblock %}
 {% block header_subtitle %}{{ template.title }}{% endblock %}
@@ -80,6 +85,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% load static %}
-<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="{% static 'meme_maker/js/editor.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/utils.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/rating.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/editor.js' %}"></script>
 {% endblock %}

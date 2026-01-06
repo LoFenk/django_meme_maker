@@ -5,6 +5,13 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-01-06
+
+### Fixed
+- **Custom Base Template Support**: All child templates now include CSS/JS via `{% block extra_head %}` and `{% block extra_js %}`
+- Static assets now load correctly when using custom `BASE_TEMPLATE` setting
+- Updated documentation with required template blocks (`extra_head`, `extra_js`, `content`)
+
 ## [1.2.1] - 2026-01-05
 
 ### Added
@@ -14,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Script and style tags now include `{% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}`
+
 
 ## [1.2.0] - 2026-01-05
 

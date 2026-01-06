@@ -1,4 +1,9 @@
 {% extends meme_maker_base_template|default:"meme_maker/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'meme_maker/css/meme_maker.css' %}">
+{% endblock %}
 
 {% block header_title %}Upload Template{% endblock %}
 {% block header_subtitle %}Add a new meme template to the bank{% endblock %}

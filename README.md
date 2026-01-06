@@ -298,12 +298,26 @@ MEME_MAKER = {
     'BASE_TEMPLATE': 'your_app/base.html',
     'EMBED_MODE': True,
 }
-
-# Your base template must have a {% block content %} where meme maker will inject its pages:
-# <body>
-#     {% block content %}{% endblock %}
-# </body>
 ```
+
+**Your base template must have these blocks:**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Your head content -->
+    {% block extra_head %}{% endblock %}  <!-- Required for meme_maker CSS -->
+</head>
+<body>
+    {% block content %}{% endblock %}      <!-- Required for page content -->
+    
+    {% block extra_js %}{% endblock %}     <!-- Required for meme_maker JS -->
+</body>
+</html>
+```
+
+The `extra_head` and `extra_js` blocks allow meme_maker to inject its CSS and JavaScript when using your custom base template.
 
 ### Option 3: Include Components in Your Templates
 
