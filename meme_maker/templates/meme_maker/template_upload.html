@@ -9,6 +9,8 @@
 {% block header_subtitle %}Add a new meme template to the bank{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 <form method="post" enctype="multipart/form-data" class="meme-form" style="max-width: 600px; margin: 0 auto;">
     {% csrf_token %}
     

@@ -9,6 +9,8 @@
 {% block header_subtitle %}Meme Template{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 <div class="template-hero">
     <div class="template-preview">
         <img src="{{ template.image.url }}" alt="{{ template.title }}">

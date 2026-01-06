@@ -9,6 +9,8 @@
 {% block header_subtitle %}Browse your collection{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 {% if memes %}
 <div class="meme-grid">
     {% for meme in memes %}

@@ -9,6 +9,8 @@
 {% block header_subtitle %}Meme #{{ meme.pk }}{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 <div class="meme-display">
     <div class="meme-display-wrapper">
         <img src="{{ meme.image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">

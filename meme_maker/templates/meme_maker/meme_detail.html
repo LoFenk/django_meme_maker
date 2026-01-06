@@ -9,6 +9,8 @@
 {% block header_subtitle %}Meme #{{ meme.pk }}{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 <div class="meme-display">
     <div class="meme-display-wrapper">
         {# If we have a generated image, show that #}

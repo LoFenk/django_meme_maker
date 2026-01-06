@@ -9,6 +9,8 @@
 {% block header_subtitle %}Search and browse meme templates{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 {# Search Form #}
 <form method="get" action="{% url 'meme_maker:template_list' %}" class="meme-search-bar">
     <input type="text" 

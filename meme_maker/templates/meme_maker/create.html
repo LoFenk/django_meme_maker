@@ -9,6 +9,8 @@
 {% block header_subtitle %}Upload an image and add your text{% endblock %}
 
 {% block content %}
+{% include "meme_maker/partials/nav.html" %}
+
 <form method="post" enctype="multipart/form-data" class="meme-form">
             {% csrf_token %}
             
