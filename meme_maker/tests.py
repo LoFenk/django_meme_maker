@@ -43,6 +43,10 @@ def get_test_image_file(name='test.png', width=800, height=600, color='red'):
         content_type='image/png'
     )
 
+def linked_object_resolver(request):
+    """Test resolver that scopes to a known user."""
+    return User.objects.filter(username='linked-resolver').first()
+
 
 # =============================================================================
 # MODEL TESTS
@@ -639,6 +643,42 @@ class MemeEditorViewTest(TestCase):
             reverse('meme_maker:meme_editor', kwargs={'template_pk': self.template.pk})
         )
         self.assertTemplateUsed(response, 'meme_maker/meme_editor.html')
+
+
+@override_settings(MEME_MAKER={'LINKED_OBJECT_RESOLVER': 'meme_maker.tests.linked_object_resolver'})
+class LinkedObjectResolverViewTest(TestCase):
+    """Tests for linked object resolver integration."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='linked-resolver', password='testpass')
+
+    def test_resolver_links_template_upload_and_filters_lists(self):
+        image_file = get_test_image_file('linked_template.png')
+        self.client.post(
+            reverse('meme_maker:template_upload'),
+            {'title': 'Linked Template', 'image': image_file}
+        )
+        template = MemeTemplate.objects.get(title='Linked Template')
+        self.assertTrue(template.is_linked_to(self.user))
+
+        unlinked_template = MemeTemplate.objects.create(
+            image=get_test_image_file('unlinked_template.png'),
+            title='Unlinked Template'
+        )
+
+        response = self.client.get(reverse('meme_maker:template_list'))
+        templates = list(response.context['templates'])
+        self.assertIn(template, templates)
+        self.assertNotIn(unlinked_template, templates)
+
+        linked_meme = Meme.objects.create(template=template)
+        linked_meme.link_to(self.user)
+        unlinked_meme = Meme.objects.create(template=unlinked_template)
+
+        response = self.client.get(reverse('meme_maker:meme_list'))
+        memes = list(response.context['memes'])
+        self.assertIn(linked_meme, memes)
+        self.assertNotIn(unlinked_meme, memes)
     
     def test_post_creates_meme(self):
         """Test POST creates a new meme."""

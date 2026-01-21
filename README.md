@@ -149,6 +149,10 @@ MEME_MAKER = {
     
     # Watermark padding from edges (in pixels)
     'WATERMARK_PADDING': 10,
+
+    # Optional linked object resolver for scoping templates/memes
+    # Accepts a dotted path or callable that receives request
+    'LINKED_OBJECT_RESOLVER': None,
 }
 ```
 
@@ -175,6 +179,34 @@ MEME_MAKER = {
 The watermark will be automatically scaled to maintain aspect ratio and placed in the bottom-right corner of all generated meme images.
 
 **Tip:** Use a transparent PNG for best results.
+
+### Linked Object Resolver (Scoped Templates/Memes)
+
+If you want meme_maker to automatically link new templates/memes to a scoped object
+(for example, a Community), and to filter list views to that object, configure a resolver:
+
+```python
+# settings.py
+MEME_MAKER = {
+    'LINKED_OBJECT_RESOLVER': 'myapp.meme_maker_resolvers.resolve_community',
+}
+```
+
+Example resolver that scopes by a community slug in the URL:
+
+```python
+# myapp/meme_maker_resolvers.py
+from communities.models import Community
+
+def resolve_community(request):
+    slug = request.resolver_match.kwargs.get('community')
+    if not slug:
+        return None
+    return Community.objects.filter(slug=slug).first()
+```
+
+The resolver can scope by subdomain, user, or any request context. If it returns `None`,
+linking/filtering is skipped.
 
 ## URLs Reference
 

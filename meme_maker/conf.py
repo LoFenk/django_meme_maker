@@ -42,6 +42,11 @@ MEME_MAKER = {
     
     # Watermark padding from edges (in pixels)
     'WATERMARK_PADDING': 10,
+
+    # Optional linked object resolver for scoping templates/memes
+    # Accepts a dotted path or callable that receives request
+    # and returns a model instance or None
+    'LINKED_OBJECT_RESOLVER': None,
 }
 """
 
@@ -73,6 +78,7 @@ class MemeMakerSettings:
         'WATERMARK_OPACITY': 0.7,  # 0.0 to 1.0
         'WATERMARK_SCALE': 0.15,  # Relative to meme width
         'WATERMARK_PADDING': 10,  # Pixels from edge
+        'LINKED_OBJECT_RESOLVER': None,  # Callable or dotted path
     }
     
     def __init__(self):
@@ -100,4 +106,3 @@ class MemeMakerSettings:
 
 # Global settings instance
 meme_maker_settings = MemeMakerSettings()
-

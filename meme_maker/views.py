@@ -17,6 +17,8 @@ from django.contrib import messages
 from django.views.generic import CreateView, DetailView, ListView
 from django.views.decorators.http import require_POST
 from django.core.files.storage import default_storage
+from django.core.exceptions import ImproperlyConfigured
+from django.utils.module_loading import import_string
 
 from .models import Meme, MemeTemplate, TemplateRating, MemeRating
 from .forms import (
@@ -29,6 +31,19 @@ from .conf import meme_maker_settings
 def get_meme_maker_context():
     """Get the meme maker configuration context for templates."""
     return meme_maker_settings.get_context()
+
+def resolve_linked_object(request):
+    """Resolve a linked object for scoping templates/memes, if configured."""
+    resolver = meme_maker_settings.LINKED_OBJECT_RESOLVER
+    if not resolver:
+        return None
+    if isinstance(resolver, str):
+        resolver = import_string(resolver)
+    if not callable(resolver):
+        raise ImproperlyConfigured(
+            "MEME_MAKER['LINKED_OBJECT_RESOLVER'] must be a callable or dotted path."
+        )
+    return resolver(request)
 
 
 # =============================================================================
@@ -65,6 +80,10 @@ def template_list(request):
         order_by = '-created'
     
     templates = MemeTemplate.search(query, order_by=order_by)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj:
+        linked_ids = MemeTemplate.objects.linked_to(linked_obj).values_list('pk', flat=True)
+        templates = templates.filter(pk__in=linked_ids)
     
     context = {
         'templates': templates,
@@ -127,6 +146,9 @@ def template_upload(request):
         form = MemeTemplateForm(request.POST, request.FILES)
         if form.is_valid():
             template = form.save()
+            linked_obj = resolve_linked_object(request)
+            if linked_obj:
+                template.link_to(linked_obj)
             messages.success(request, f'Template "{template.title}" uploaded successfully!')
             # Redirect to editor to create a meme from this template
             return redirect('meme_maker:meme_editor', template_pk=template.pk)
@@ -208,6 +230,9 @@ def meme_editor(request, template_pk):
                     meme.bottom_text = overlay.get('text', '')
             
             meme.save()
+            linked_obj = resolve_linked_object(request)
+            if linked_obj:
+                meme.link_to(linked_obj)
             messages.success(request, 'Meme created successfully!')
             return redirect('meme_maker:meme_detail', pk=meme.pk)
     else:
@@ -271,7 +296,11 @@ def meme_list(request):
     if order_by not in valid_orders:
         order_by = '-created'
     
-    memes = Meme.objects.all()
+    linked_obj = resolve_linked_object(request)
+    if linked_obj:
+        memes = Meme.objects.linked_to(linked_obj)
+    else:
+        memes = Meme.objects.all()
     
     # Apply ordering
     if order_by == 'rating' or order_by == '-rating':
@@ -460,6 +489,9 @@ def create_meme(request):
         form = MemeForm(request.POST, request.FILES)
         if form.is_valid():
             meme = form.save()
+            linked_obj = resolve_linked_object(request)
+            if linked_obj:
+                meme.link_to(linked_obj)
             messages.success(request, 'Meme created successfully!')
             return redirect('meme_maker:meme_detail', pk=meme.pk)
     else:
@@ -495,8 +527,14 @@ class MemeTemplateListView(ListView):
     def get_queryset(self):
         query = self.request.GET.get('q', '').strip()
         if query:
-            return MemeTemplate.search(query)
-        return MemeTemplate.objects.all()
+            qs = MemeTemplate.search(query)
+        else:
+            qs = MemeTemplate.objects.all()
+        linked_obj = resolve_linked_object(self.request)
+        if linked_obj:
+            linked_ids = MemeTemplate.objects.linked_to(linked_obj).values_list('pk', flat=True)
+            qs = qs.filter(pk__in=linked_ids)
+        return qs
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -538,6 +576,9 @@ class MemeTemplateCreateView(CreateView):
     
     def form_valid(self, form):
         response = super().form_valid(form)
+        linked_obj = resolve_linked_object(self.request)
+        if linked_obj:
+            self.object.link_to(linked_obj)
         messages.success(self.request, f'Template "{self.object.title}" uploaded successfully!')
         return response
     
@@ -559,8 +600,12 @@ class MemeCreateView(CreateView):
         return context
     
     def form_valid(self, form):
+        response = super().form_valid(form)
+        linked_obj = resolve_linked_object(self.request)
+        if linked_obj:
+            self.object.link_to(linked_obj)
         messages.success(self.request, 'Meme created successfully!')
-        return super().form_valid(form)
+        return response
 
 
 class MemeDetailView(DetailView):
@@ -583,6 +628,12 @@ class MemeListView(ListView):
     template_name = 'meme_maker/meme_list.html'
     context_object_name = 'memes'
     paginate_by = 12
+
+    def get_queryset(self):
+        linked_obj = resolve_linked_object(self.request)
+        if linked_obj:
+            return Meme.objects.linked_to(linked_obj)
+        return Meme.objects.all()
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
