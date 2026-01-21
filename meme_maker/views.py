@@ -34,8 +34,11 @@ def get_meme_maker_context():
 
 def resolve_linked_object(request):
     """Resolve a linked object for scoping templates/memes, if configured."""
+    if hasattr(request, '_meme_maker_linked_object'):
+        return request._meme_maker_linked_object
     resolver = meme_maker_settings.LINKED_OBJECT_RESOLVER
     if not resolver:
+        request._meme_maker_linked_object = None
         return None
     if isinstance(resolver, str):
         resolver = import_string(resolver)
@@ -43,7 +46,8 @@ def resolve_linked_object(request):
         raise ImproperlyConfigured(
             "MEME_MAKER['LINKED_OBJECT_RESOLVER'] must be a callable or dotted path."
         )
-    return resolver(request)
+    request._meme_maker_linked_object = resolver(request)
+    return request._meme_maker_linked_object
 
 
 # =============================================================================
@@ -108,9 +112,17 @@ def template_detail(request, pk):
     - Star rating widget
     """
     template = get_object_or_404(MemeTemplate, pk=pk)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not template.is_linked_to(linked_obj):
+        raise Http404
     
     # Get recent memes made from this template
-    recent_memes = template.memes.all()[:6]
+    recent_memes = template.memes.all()
+    if linked_obj:
+        recent_memes = recent_memes.filter(
+            pk__in=Meme.objects.linked_to(linked_obj).values_list('pk', flat=True)
+        )
+    recent_memes = recent_memes[:6]
     
     # Check if user has already rated this template
     user_rating = None
@@ -172,6 +184,9 @@ def template_download(request, pk):
     Returns the template image file as a download.
     """
     template = get_object_or_404(MemeTemplate, pk=pk)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not template.is_linked_to(linked_obj):
+        raise Http404
     
     if not template.image:
         raise Http404("Template has no image")
@@ -261,6 +276,9 @@ def meme_detail(request, pk):
     Includes star rating widget.
     """
     meme = get_object_or_404(Meme, pk=pk)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not meme.is_linked_to(linked_obj):
+        raise Http404
     
     # Check if user has already rated this meme
     user_rating = None
@@ -342,6 +360,9 @@ def meme_download(request, pk):
     otherwise returns the source image.
     """
     meme = get_object_or_404(Meme, pk=pk)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not meme.is_linked_to(linked_obj):
+        raise Http404
     
     # Prefer generated image, fall back to source
     image_field = meme.generated_image if meme.generated_image else meme.get_source_image()
@@ -389,6 +410,9 @@ def rate_template(request, pk):
     Returns: { "success": true, "average_rating": X.X, "rating_count": N, "user_rating": N }
     """
     template = get_object_or_404(MemeTemplate, pk=pk)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not template.is_linked_to(linked_obj):
+        raise Http404
     
     try:
         data = json.loads(request.body)
@@ -436,6 +460,9 @@ def rate_meme(request, pk):
     Returns: { "success": true, "average_rating": X.X, "rating_count": N, "user_rating": N }
     """
     meme = get_object_or_404(Meme, pk=pk)
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not meme.is_linked_to(linked_obj):
+        raise Http404
     
     try:
         data = json.loads(request.body)
@@ -554,7 +581,15 @@ class MemeTemplateDetailView(DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['recent_memes'] = self.object.memes.all()[:6]
+        linked_obj = resolve_linked_object(self.request)
+        if linked_obj and not self.object.is_linked_to(linked_obj):
+            raise Http404
+        recent_memes = self.object.memes.all()
+        if linked_obj:
+            recent_memes = recent_memes.filter(
+                pk__in=Meme.objects.linked_to(linked_obj).values_list('pk', flat=True)
+            )
+        context['recent_memes'] = recent_memes[:6]
         context['title'] = self.object.title
         context['page_type'] = 'template_detail'
         context.update(get_meme_maker_context())
@@ -616,6 +651,9 @@ class MemeDetailView(DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        linked_obj = resolve_linked_object(self.request)
+        if linked_obj and not self.object.is_linked_to(linked_obj):
+            raise Http404
         context['title'] = f'Meme #{self.object.pk}'
         context['page_type'] = 'meme_detail'
         context.update(get_meme_maker_context())
