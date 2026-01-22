@@ -38,11 +38,10 @@ if settings.DEBUG:
 # =============================================================================
 # If you want more control over the URL patterns, you can use the CBVs directly:
 
-# from meme_maker.views import MemeCreateView, MemeDetailView, MemeListView
+# from meme_maker.views import MemeDetailView, MemeListView
 
 # urlpatterns = [
 #     # Custom meme maker URLs
-#     path('create-your-meme/', MemeCreateView.as_view(), name='custom_create'),
 #     path('view-meme/<int:pk>/', MemeDetailView.as_view(), name='custom_detail'),
 #     path('browse-memes/', MemeListView.as_view(), name='custom_list'),
 # ]
@@ -54,20 +53,19 @@ if settings.DEBUG:
 # You can also create your own views that use the meme maker models and forms:
 
 # from django.shortcuts import render, redirect
-# from meme_maker import Meme, MemeForm
+# from meme_maker import Meme
 #
 # def my_custom_meme_view(request):
 #     if request.method == 'POST':
-#         form = MemeForm(request.POST, request.FILES)
+#         # form = MemeEditorForm(request.POST)
 #         if form.is_valid():
 #             meme = form.save()
 #             # Add your custom logic here
 #             return redirect('meme_detail', pk=meme.pk)
 #     else:
-#         form = MemeForm()
+#         # form = MemeEditorForm()
 #     
 #     return render(request, 'my_template.html', {
 #         'form': form,
 #         'recent_memes': Meme.objects.all()[:5],
 #     })
-

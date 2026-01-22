@@ -8,12 +8,14 @@ URL Structure:
     /templates/upload/          → Upload new template
     /templates/<pk>/download/   → Download template image
     /templates/<pk>/rate/       → Rate a template (POST)
+    /templates/<pk>/flag/       → Flag a template (POST)
+    /templates/<pk>/memes/      → Template memes partial (GET)
     /editor/<template_pk>/      → Meme editor for a template
     /meme/<pk>/                 → View a meme
     /meme/<pk>/download/        → Download meme image
     /meme/<pk>/rate/            → Rate a meme (POST)
+    /meme/<pk>/flag/            → Flag a meme (POST)
     /memes/                     → List all memes (supports ?order=rating)
-    /create/                    → Legacy: direct meme creation
 """
 
 from django.urls import path
@@ -31,6 +33,8 @@ urlpatterns = [
     path('templates/<int:pk>/', views.template_detail, name='template_detail'),
     path('templates/<int:pk>/download/', views.template_download, name='template_download'),
     path('templates/<int:pk>/rate/', views.rate_template, name='rate_template'),
+    path('templates/<int:pk>/flag/', views.flag_template, name='flag_template'),
+    path('templates/<int:pk>/memes/', views.template_memes_partial, name='template_memes_partial'),
     
     # Meme Editor
     path('editor/<int:template_pk>/', views.meme_editor, name='meme_editor'),
@@ -39,9 +43,7 @@ urlpatterns = [
     path('meme/<int:pk>/', views.meme_detail, name='meme_detail'),
     path('meme/<int:pk>/download/', views.meme_download, name='meme_download'),
     path('meme/<int:pk>/rate/', views.rate_meme, name='rate_meme'),
+    path('meme/<int:pk>/flag/', views.flag_meme, name='flag_meme'),
     path('memes/', views.meme_list, name='meme_list'),
     
-    # Legacy URLs (backward compatibility)
-    path('create/', views.create_meme, name='create'),
-    path('detail/<int:pk>/', views.detail, name='detail'),  # Old detail URL
 ]

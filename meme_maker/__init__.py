@@ -21,7 +21,7 @@ Quick Start:
 For configuration options, see the README or the conf module.
 
 Usage after Django is loaded:
-    from meme_maker import Meme, MemeTemplate, MemeForm, meme_maker_settings
+    from meme_maker import Meme, MemeTemplate, MemeTemplateForm, meme_maker_settings
 """
 
 __version__ = '1.2.6'
@@ -44,12 +44,6 @@ def __getattr__(name):
     elif name == 'MemeTemplate':
         from .models import MemeTemplate
         return MemeTemplate
-    elif name == 'MemeForm':
-        from .forms import MemeForm
-        return MemeForm
-    elif name == 'MemeEditForm':
-        from .forms import MemeEditForm
-        return MemeEditForm
     elif name == 'MemeTemplateForm':
         from .forms import MemeTemplateForm
         return MemeTemplateForm
@@ -65,8 +59,6 @@ def __getattr__(name):
 __all__ = [
     'Meme',
     'MemeTemplate',
-    'MemeForm',
-    'MemeEditForm',
     'MemeTemplateForm',
     'MemeEditorForm',
     'meme_maker_settings',

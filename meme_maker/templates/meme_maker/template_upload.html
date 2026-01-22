@@ -52,6 +52,21 @@
         <p class="meme-form-error">{{ form.tags.errors.0 }}</p>
         {% endif %}
     </div>
+
+    <div class="meme-form-group">
+        <div class="meme-checkbox-group">
+            {{ form.nsfw }}
+            <label for="{{ form.nsfw.id_for_label }}" class="meme-form-label" style="margin: 0;">
+                {{ form.nsfw.label }}
+            </label>
+        </div>
+        {% if form.nsfw.help_text %}
+        <p class="meme-form-help">{{ form.nsfw.help_text }}</p>
+        {% endif %}
+        {% if form.nsfw.errors %}
+        <p class="meme-form-error">{{ form.nsfw.errors.0 }}</p>
+        {% endif %}
+    </div>
     
     <button type="submit" class="meme-btn meme-btn-full">
         Upload & Create Meme →
@@ -62,4 +77,3 @@
     </p>
 </form>
 {% endblock %}
-

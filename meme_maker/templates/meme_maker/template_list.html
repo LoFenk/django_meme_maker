@@ -20,6 +20,7 @@
            placeholder="Search templates by name or tags..."
            autocomplete="off">
     <input type="hidden" name="order" value="{{ order_by }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
     <button type="submit" class="meme-btn">Search</button>
 </form>
 
@@ -36,9 +37,17 @@
             <option value="-title" {% if order_by == '-title' %}selected{% endif %}>Title Z-A</option>
         </select>
     </div>
+    <div>
+        <label for="per-page-select">Per page:</label>
+        <select id="per-page-select" onchange="updatePerPage(this.value)">
+            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+        </select>
+    </div>
     {% if query %}
     <span style="color: var(--meme-text-light);">
-        Found {{ templates|length }} template{{ templates|length|pluralize }} for "{{ query }}"
+        Found {{ total_count }} template{{ total_count|pluralize }} for "{{ query }}"
         <a href="{% url 'meme_maker:template_list' %}" style="color: var(--meme-primary);">Clear</a>
     </span>
     {% endif %}
@@ -47,36 +56,38 @@
 {% if templates %}
 <div class="meme-grid">
     {% for template in templates %}
-    <a href="{% url 'meme_maker:template_detail' template.pk %}" class="meme-card">
-        <img src="{{ template.image.url }}" alt="{{ template.title }}" class="meme-card-image">
-        <div class="meme-card-body">
-            <h3 class="meme-card-title">{{ template.title }}</h3>
-            {# Rating display - inline for simplicity #}
-            <div class="meme-rating-compact">
-                <span class="star">★</span>
-                <span>{{ template.get_average_rating }}</span>
-                {% if template.rating_count > 0 %}
-                <span>({{ template.rating_count }})</span>
+    <div class="meme-card-wrapper">
+        <a href="{% url 'meme_maker:template_detail' template.pk %}" class="meme-card">
+            <img src="{{ template.image.url }}" alt="{{ template.title }}" class="meme-card-image">
+            <div class="meme-card-body">
+                <h3 class="meme-card-title">{{ template.title }}</h3>
+                {# Rating display - inline for simplicity #}
+                <div class="meme-rating-compact">
+                    <span class="star">★</span>
+                    <span>{{ template.get_average_rating }}</span>
+                    {% if template.rating_count > 0 %}
+                    <span>({{ template.rating_count }})</span>
+                    {% endif %}
+                </div>
+                {% if template.tags %}
+                <div class="meme-tags">
+                    {% for tag in template.get_tags_list %}
+                    <span class="meme-tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
                 {% endif %}
+                <p class="meme-card-meta">{{ template.unflagged_meme_count }} meme{{ template.unflagged_meme_count|pluralize }} created</p>
             </div>
-            {% if template.tags %}
-            <div class="meme-tags">
-                {% for tag in template.get_tags_list %}
-                <span class="meme-tag">{{ tag }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
-            <p class="meme-card-meta">{{ template.memes.count }} meme{{ template.memes.count|pluralize }} created</p>
-        </div>
-    </a>
+        </a>
+    </div>
     {% endfor %}
 </div>
 
 {% if is_paginated %}
 <div class="meme-pagination">
     {% if page_obj.has_previous %}
-    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page=1">&laquo; First</a>
-    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page={{ page_obj.previous_page_number }}">Previous</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&per_page={{ per_page }}&page=1">&laquo; First</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">Previous</a>
     {% endif %}
     
     <span class="current">
@@ -84,8 +95,8 @@
     </span>
     
     {% if page_obj.has_next %}
-    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page={{ page_obj.next_page_number }}">Next</a>
-    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}">Next</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}order={{ order_by }}&per_page={{ per_page }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
     {% endif %}
 </div>
 {% endif %}
@@ -118,4 +129,3 @@
 <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/utils.js' %}"></script>
 <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/rating.js' %}"></script>
 {% endblock %}
-

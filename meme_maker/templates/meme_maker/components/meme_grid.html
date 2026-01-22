@@ -29,9 +29,8 @@ Optional context:
     <div class="meme-empty-icon">🎨</div>
     <h2 class="meme-empty-title">{{ empty_title|default:"No memes yet!" }}</h2>
     <p class="meme-empty-text">{{ empty_message|default:"Create your first meme to get started." }}</p>
-    <a href="{% url 'meme_maker:create' %}" class="meme-btn">
-        Create Your First Meme →
+    <a href="{% url 'meme_maker:template_list' %}" class="meme-btn">
+        Browse Templates →
     </a>
 </div>
 {% endif %}
-

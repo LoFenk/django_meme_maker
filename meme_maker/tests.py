@@ -21,8 +21,8 @@ from django.core.files.base import ContentFile
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 
-from .models import MemeTemplate, Meme, TemplateLink, MemeLink
-from .forms import MemeTemplateForm, MemeEditorForm, MemeForm, MemeTemplateSearchForm
+from .models import MemeTemplate, Meme, TemplateLink, MemeLink, TemplateFlag, MemeFlag
+from .forms import MemeTemplateForm, MemeEditorForm, MemeTemplateSearchForm
 
 
 def create_test_image(width=800, height=600, color='red', format='PNG'):
@@ -149,36 +149,28 @@ class MemeModelTest(TestCase):
         """Test creating a meme from a template."""
         meme = Meme.objects.create(
             template=self.template,
-            top_text='Hello',
-            bottom_text='World'
+            text_overlays={
+                'overlays': [
+                    {'text': 'Hello', 'position': 'top'},
+                    {'text': 'World', 'position': 'bottom'},
+                ]
+            }
         )
         self.assertEqual(meme.template, self.template)
-        self.assertEqual(meme.top_text, 'Hello')
-        self.assertEqual(meme.bottom_text, 'World')
-    
-    def test_meme_creation_legacy(self):
-        """Test creating a meme with direct image upload (legacy)."""
-        meme = Meme.objects.create(
-            image=get_test_image_file('meme.png'),
-            top_text='Legacy',
-            bottom_text='Meme'
-        )
-        self.assertIsNone(meme.template)
-        self.assertTrue(meme.image)
+        self.assertEqual(meme.get_overlays()[0]['text'], 'Hello')
     
     def test_meme_str_with_template(self):
         """Test string representation with template."""
         meme = Meme.objects.create(
             template=self.template,
-            top_text='Test'
+            text_overlays={'overlays': [{'text': 'Test', 'position': 'top'}]}
         )
         self.assertIn('Test Template', str(meme))
     
     def test_meme_str_without_template(self):
         """Test string representation without template."""
         meme = Meme.objects.create(
-            image=get_test_image_file('meme.png'),
-            top_text='Hello World Test'
+            text_overlays={'overlays': [{'text': 'Hello World Test', 'position': 'top'}]}
         )
         self.assertIn('Hello World Test', str(meme))
     
@@ -194,13 +186,6 @@ class MemeModelTest(TestCase):
         meme = Meme.objects.create(template=self.template)
         source = meme.get_source_image()
         self.assertEqual(source, self.template.image)
-    
-    def test_get_source_image_direct(self):
-        """Test getting source image from direct upload."""
-        image_file = get_test_image_file('direct.png')
-        meme = Meme.objects.create(image=image_file)
-        source = meme.get_source_image()
-        self.assertEqual(source, meme.image)
     
     def test_set_and_get_overlays(self):
         """Test setting and getting text overlays."""
@@ -229,30 +214,14 @@ class MemeModelTest(TestCase):
         self.assertEqual(css_overlays[0]['text'], 'Test')
         self.assertEqual(css_overlays[0]['position'], 'top')
     
-    def test_get_overlay_for_css_legacy(self):
-        """Test CSS overlay generation from legacy fields."""
-        meme = Meme.objects.create(
-            template=self.template,
-            top_text='Legacy Top',
-            bottom_text='Legacy Bottom'
-        )
-        # Clear overlays to use legacy fields
-        meme.text_overlays = {}
-        meme.save()
-        
-        css_overlays = meme.get_overlay_for_css()
-        self.assertEqual(len(css_overlays), 2)
-        texts = [o['text'] for o in css_overlays]
-        self.assertIn('Legacy Top', texts)
-        self.assertIn('Legacy Bottom', texts)
-    
     def test_image_generation(self):
         """Test that image generation creates a file."""
-        meme = Meme.objects.create(
-            template=self.template,
-            top_text='Generated',
-            bottom_text='Image'
-        )
+        meme = Meme.objects.create(template=self.template)
+        meme.set_overlays([
+            {'text': 'Generated', 'position': 'top'},
+            {'text': 'Image', 'position': 'bottom'},
+        ])
+        meme.save()
         # Refresh from DB to get updated generated_image
         meme.refresh_from_db()
         
@@ -263,8 +232,8 @@ class MemeModelTest(TestCase):
     
     def test_ordering(self):
         """Test that memes are ordered by created_at descending."""
-        meme1 = Meme.objects.create(template=self.template, top_text='First')
-        meme2 = Meme.objects.create(template=self.template, top_text='Second')
+        meme1 = Meme.objects.create(template=self.template, text_overlays={'overlays': [{'text': 'First', 'position': 'top'}]})
+        meme2 = Meme.objects.create(template=self.template, text_overlays={'overlays': [{'text': 'Second', 'position': 'top'}]})
         
         memes = list(Meme.objects.all())
         self.assertEqual(memes[0], meme2)
@@ -380,39 +349,6 @@ class MemeEditorFormTest(TestCase):
         self.assertEqual(len(overlays), 0)
 
 
-class MemeFormTest(TestCase):
-    """Tests for MemeForm (legacy)."""
-    
-    def test_valid_form(self):
-        """Test form with valid data."""
-        image_file = get_test_image_file('meme.png')
-        form = MemeForm(
-            data={'top_text': 'Hello', 'bottom_text': 'World'},
-            files={'image': image_file}
-        )
-        self.assertTrue(form.is_valid())
-    
-    def test_image_is_optional(self):
-        """Test form without image is valid (memes can use templates)."""
-        # Image is optional in the model since memes can be created from templates
-        form = MemeForm(data={'top_text': 'Test'})
-        self.assertTrue(form.is_valid())
-    
-    def test_optional_text(self):
-        """Test that text fields are optional."""
-        image_file = get_test_image_file('meme.png')
-        form = MemeForm(
-            data={},
-            files={'image': image_file}
-        )
-        self.assertTrue(form.is_valid())
-    
-    def test_completely_empty_form(self):
-        """Test that completely empty form is valid (all fields optional)."""
-        form = MemeForm(data={})
-        self.assertTrue(form.is_valid())
-
-
 class MemeTemplateSearchFormTest(TestCase):
     """Tests for MemeTemplateSearchForm."""
     
@@ -496,6 +432,25 @@ class TemplateListViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         # Check for empty state message or zero templates
 
+    def test_flagged_templates_filtered(self):
+        """Flagged templates should not appear in list."""
+        self.template1.flagged = True
+        self.template1.save(update_fields=['flagged'])
+        response = self.client.get(reverse('meme_maker:template_list'))
+        templates = list(response.context['templates'])
+        self.assertNotIn(self.template1, templates)
+        self.assertIn(self.template2, templates)
+
+    def test_pagination_per_page(self):
+        """Per-page parameter should limit templates."""
+        for idx in range(30):
+            MemeTemplate.objects.create(
+                image=get_test_image_file(f't{idx}.png'),
+                title=f'Template {idx}',
+            )
+        response = self.client.get(reverse('meme_maker:template_list'), {'per_page': 10})
+        self.assertEqual(len(response.context['templates']), 10)
+
 
 class TemplateDetailViewTest(TestCase):
     """Tests for template detail view."""
@@ -541,6 +496,15 @@ class TemplateDetailViewTest(TestCase):
         """Test 404 for non-existent template."""
         response = self.client.get(
             reverse('meme_maker:template_detail', kwargs={'pk': 99999})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_flagged_template_404s(self):
+        """Flagged templates should 404."""
+        self.template.flagged = True
+        self.template.save(update_fields=['flagged'])
+        response = self.client.get(
+            reverse('meme_maker:template_detail', kwargs={'pk': self.template.pk})
         )
         self.assertEqual(response.status_code, 404)
 
@@ -661,7 +625,8 @@ class MemeEditorViewTest(TestCase):
         self.assertEqual(Meme.objects.count(), 1)
         meme = Meme.objects.first()
         self.assertEqual(meme.template, self.template)
-        self.assertEqual(meme.top_text, 'Hello')
+        overlays = meme.get_overlays()
+        self.assertEqual(overlays[0]['text'], 'Hello')
     
     def test_post_redirects_to_detail(self):
         """Test successful POST redirects to meme detail."""
@@ -732,8 +697,7 @@ class MemeDetailViewTest(TestCase):
         )
         self.meme = Meme.objects.create(
             template=self.template,
-            top_text='Hello',
-            bottom_text='World'
+            text_overlays={'overlays': [{'text': 'Hello', 'position': 'top'}]}
         )
     
     def test_view_url(self):
@@ -773,6 +737,15 @@ class MemeDetailViewTest(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_flagged_meme_404s(self):
+        """Flagged memes should 404."""
+        self.meme.flagged = True
+        self.meme.save(update_fields=['flagged'])
+        response = self.client.get(
+            reverse('meme_maker:meme_detail', kwargs={'pk': self.meme.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
 
 class MemeListViewTest(TestCase):
     """Tests for meme list view."""
@@ -785,11 +758,11 @@ class MemeListViewTest(TestCase):
         )
         self.meme1 = Meme.objects.create(
             template=self.template,
-            top_text='First'
+            text_overlays={'overlays': [{'text': 'First', 'position': 'top'}]}
         )
         self.meme2 = Meme.objects.create(
             template=self.template,
-            top_text='Second'
+            text_overlays={'overlays': [{'text': 'Second', 'position': 'top'}]}
         )
     
     def test_view_url(self):
@@ -815,6 +788,25 @@ class MemeListViewTest(TestCase):
         response = self.client.get(reverse('meme_maker:meme_list'))
         self.assertEqual(response.status_code, 200)
 
+    def test_pagination_per_page(self):
+        """Per-page parameter should limit memes."""
+        for idx in range(30):
+            Meme.objects.create(
+                template=self.template,
+                text_overlays={'overlays': [{'text': f'M{idx}', 'position': 'top'}]}
+            )
+        response = self.client.get(reverse('meme_maker:meme_list'), {'per_page': 10})
+        self.assertEqual(len(response.context['memes']), 10)
+
+    def test_flagged_memes_filtered(self):
+        """Flagged memes should not appear in list."""
+        self.meme1.flagged = True
+        self.meme1.save(update_fields=['flagged'])
+        response = self.client.get(reverse('meme_maker:meme_list'))
+        memes = list(response.context['memes'])
+        self.assertNotIn(self.meme1, memes)
+        self.assertIn(self.meme2, memes)
+
 
 class MemeDownloadViewTest(TestCase):
     """Tests for meme download view."""
@@ -827,7 +819,7 @@ class MemeDownloadViewTest(TestCase):
         )
         self.meme = Meme.objects.create(
             template=self.template,
-            top_text='Download Test'
+            text_overlays={'overlays': [{'text': 'Download Test', 'position': 'top'}]}
         )
     
     def test_download_returns_file(self):
@@ -844,36 +836,6 @@ class MemeDownloadViewTest(TestCase):
             reverse('meme_maker:meme_download', kwargs={'pk': 99999})
         )
         self.assertEqual(response.status_code, 404)
-
-
-class LegacyCreateViewTest(TestCase):
-    """Tests for legacy create view."""
-    
-    def test_view_url(self):
-        """Test the view is accessible."""
-        response = self.client.get(reverse('meme_maker:create'))
-        self.assertEqual(response.status_code, 200)
-    
-    def test_view_uses_correct_template(self):
-        """Test correct template is used."""
-        response = self.client.get(reverse('meme_maker:create'))
-        self.assertTemplateUsed(response, 'meme_maker/create.html')
-    
-    def test_post_creates_meme(self):
-        """Test POST creates a new meme."""
-        image_file = get_test_image_file('legacy_meme.png')
-        response = self.client.post(
-            reverse('meme_maker:create'),
-            {
-                'image': image_file,
-                'top_text': 'Legacy',
-                'bottom_text': 'Create'
-            }
-        )
-        
-        self.assertEqual(Meme.objects.count(), 1)
-        meme = Meme.objects.first()
-        self.assertEqual(meme.top_text, 'Legacy')
 
 
 # =============================================================================
@@ -928,12 +890,6 @@ class URLTests(TestCase):
         url = reverse('meme_maker:meme_list')
         self.assertEqual(url, '/memes/')
     
-    def test_legacy_create_url(self):
-        """Test legacy create URL resolves."""
-        url = reverse('meme_maker:create')
-        self.assertEqual(url, '/create/')
-
-
 # =============================================================================
 # INTEGRATION TESTS
 # =============================================================================
@@ -972,6 +928,7 @@ class MemeCreationWorkflowTest(TestCase):
         meme = Meme.objects.first()
         self.assertIsNotNone(meme)
         self.assertEqual(meme.template, template)
+        self.assertTrue(meme.get_overlays())
         
         # Step 3: View the meme
         response = client.get(
@@ -1020,6 +977,134 @@ class MemeCreationWorkflowTest(TestCase):
         
         meme = Meme.objects.first()
         self.assertEqual(meme.template, t1)
+
+
+class FlaggingTests(TestCase):
+    """Tests for content flagging."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='flagger', password='testpass')
+        self.template = MemeTemplate.objects.create(
+            image=get_test_image_file('flag_template.png'),
+            title='Flag Template'
+        )
+        self.meme = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Flag Me', 'position': 'top'}]}
+        )
+
+    def test_flag_requires_login(self):
+        response = self.client.post(
+            reverse('meme_maker:flag_template', kwargs={'pk': self.template.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(TemplateFlag.objects.count(), 0)
+
+    def test_flag_template_marks_flagged(self):
+        self.client.login(username='flagger', password='testpass')
+        response = self.client.post(
+            reverse('meme_maker:flag_template', kwargs={'pk': self.template.pk})
+        )
+        self.template.refresh_from_db()
+        self.assertTrue(self.template.flagged)
+        self.assertIsNotNone(self.template.flagged_at)
+        self.assertEqual(TemplateFlag.objects.count(), 1)
+
+    def test_flag_meme_marks_flagged(self):
+        self.client.login(username='flagger', password='testpass')
+        response = self.client.post(
+            reverse('meme_maker:flag_meme', kwargs={'pk': self.meme.pk})
+        )
+        self.meme.refresh_from_db()
+        self.assertTrue(self.meme.flagged)
+        self.assertIsNotNone(self.meme.flagged_at)
+        self.assertEqual(MemeFlag.objects.count(), 1)
+
+    def test_daily_flag_limit(self):
+        self.client.login(username='flagger', password='testpass')
+        for idx in range(5):
+            template = MemeTemplate.objects.create(
+                image=get_test_image_file(f'flag_{idx}.png'),
+                title=f'Flag {idx}'
+            )
+            self.client.post(reverse('meme_maker:flag_template', kwargs={'pk': template.pk}))
+        meme = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Another', 'position': 'top'}]}
+        )
+        self.client.post(reverse('meme_maker:flag_meme', kwargs={'pk': meme.pk}))
+        meme.refresh_from_db()
+        self.assertFalse(meme.flagged)
+
+
+class TemplateMemesSortingTests(TestCase):
+    """Tests for template meme sorting endpoint."""
+
+    def setUp(self):
+        self.template = MemeTemplate.objects.create(
+            image=get_test_image_file('sort_template.png'),
+            title='Sort Template'
+        )
+        self.meme_recent = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Recent', 'position': 'top'}]},
+            rating_sum=0,
+            rating_count=0,
+        )
+        self.meme_best = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Best', 'position': 'top'}]},
+            rating_sum=25,
+            rating_count=5,
+        )
+        self.meme_popular = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Popular', 'position': 'top'}]},
+            rating_sum=40,
+            rating_count=10,
+        )
+        self.meme_worst = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Worst', 'position': 'top'}]},
+            rating_sum=1,
+            rating_count=1,
+        )
+
+    def test_best_filters_min_ratings(self):
+        response = self.client.get(
+            reverse('meme_maker:template_memes_partial', kwargs={'pk': self.template.pk}),
+            {'sort': 'best'}
+        )
+        self.assertEqual(response.status_code, 200)
+        memes = list(response.context['recent_memes'])
+        self.assertIn(self.meme_best, memes)
+        self.assertNotIn(self.meme_recent, memes)
+
+    def test_popular_filters_avg_floor(self):
+        response = self.client.get(
+            reverse('meme_maker:template_memes_partial', kwargs={'pk': self.template.pk}),
+            {'sort': 'popular'}
+        )
+        memes = list(response.context['recent_memes'])
+        self.assertIn(self.meme_popular, memes)
+        self.assertNotIn(self.meme_worst, memes)
+
+    def test_worst_orders_lowest(self):
+        response = self.client.get(
+            reverse('meme_maker:template_memes_partial', kwargs={'pk': self.template.pk}),
+            {'sort': 'worst'}
+        )
+        memes = list(response.context['recent_memes'])
+        self.assertTrue(memes)
+        self.assertEqual(memes[0], self.meme_worst)
+
+    def test_random_returns_subset(self):
+        response = self.client.get(
+            reverse('meme_maker:template_memes_partial', kwargs={'pk': self.template.pk}),
+            {'sort': 'random'}
+        )
+        memes = list(response.context['recent_memes'])
+        self.assertTrue(len(memes) <= 6)
 
 
 # =============================================================================
@@ -1093,8 +1178,7 @@ class EdgeCaseTests(TestCase):
             title='No Text Test'
         )
         meme = Meme.objects.create(template=template)
-        self.assertEqual(meme.top_text, '')
-        self.assertEqual(meme.bottom_text, '')
+        self.assertEqual(meme.get_overlays(), [])
     
     def test_meme_overlays_json_structure(self):
         """Test the structure of text overlays JSON."""
@@ -1128,7 +1212,7 @@ class EdgeCaseTests(TestCase):
         )
         meme = Meme.objects.create(
             template=template,
-            top_text='Keep Me'
+            text_overlays={'overlays': [{'text': 'Keep Me', 'position': 'top'}]}
         )
         meme_pk = meme.pk
         
@@ -1137,7 +1221,7 @@ class EdgeCaseTests(TestCase):
         # Meme should still exist with null template
         meme = Meme.objects.get(pk=meme_pk)
         self.assertIsNone(meme.template)
-        self.assertEqual(meme.top_text, 'Keep Me')
+        self.assertEqual(meme.get_overlays()[0]['text'], 'Keep Me')
 
 
 # =============================================================================
@@ -1455,12 +1539,18 @@ class MemeListOrderingTest(TestCase):
             title='Test Template'
         )
         
-        self.meme_low = Meme.objects.create(template=self.template, top_text='Low')
+        self.meme_low = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'Low', 'position': 'top'}]}
+        )
         self.meme_low.rating_sum = 4
         self.meme_low.rating_count = 2
         self.meme_low.save()
         
-        self.meme_high = Meme.objects.create(template=self.template, top_text='High')
+        self.meme_high = Meme.objects.create(
+            template=self.template,
+            text_overlays={'overlays': [{'text': 'High', 'position': 'top'}]}
+        )
         self.meme_high.rating_sum = 10
         self.meme_high.rating_count = 2
         self.meme_high.save()
@@ -1634,8 +1724,7 @@ class MemeLinkingTests(TestCase):
         )
         self.meme = Meme.objects.create(
             template=self.template,
-            top_text='Hello',
-            bottom_text='World'
+            text_overlays={'overlays': [{'text': 'Hello', 'position': 'top'}, {'text': 'World', 'position': 'bottom'}]}
         )
         self.user1 = User.objects.create_user(username='memeuser1', password='testpass')
         self.user2 = User.objects.create_user(username='memeuser2', password='testpass')
@@ -1677,8 +1766,7 @@ class MemeLinkingTests(TestCase):
         """Test querying memes by linked object using the manager."""
         meme2 = Meme.objects.create(
             template=self.template,
-            top_text='Another',
-            bottom_text='Meme'
+            text_overlays={'overlays': [{'text': 'Another', 'position': 'top'}, {'text': 'Meme', 'position': 'bottom'}]}
         )
         
         self.meme.link_to(self.user1)
@@ -1724,7 +1812,7 @@ class LinkCascadeDeleteTests(TestCase):
         )
         self.meme = Meme.objects.create(
             template=self.template,
-            top_text='Test'
+            text_overlays={'overlays': [{'text': 'Test', 'position': 'top'}]}
         )
         self.user = User.objects.create_user(username='linkuser', password='testpass')
     

@@ -115,14 +115,12 @@
     </div>
     
     <div class="section create-section">
-        <h3>Quick Create</h3>
-        {# You can include the form component here, but you'd need to pass a form #}
-        {# For a full form, link to the create page instead #}
+        <h3>Get Started</h3>
         <p style="margin-bottom: 1rem; color: #666;">
             Want to create your own meme? It only takes a few seconds!
         </p>
-        <a href="{% url 'meme_maker:create' %}" class="meme-btn">
-            Create a Meme →
+        <a href="{% url 'meme_maker:template_list' %}" class="meme-btn">
+            Browse Templates →
         </a>
     </div>
 </div>
@@ -152,4 +150,3 @@
 -->
 
 {% endblock %}
-

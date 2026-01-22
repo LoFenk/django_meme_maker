@@ -17,12 +17,19 @@ Optional context:
 
 <div class="meme-display">
     <div class="meme-display-wrapper">
-        <img src="{{ meme.image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image">
-        {% if meme.top_text %}
-        <div class="meme-text-overlay meme-text-top">{{ meme.top_text }}</div>
-        {% endif %}
-        {% if meme.bottom_text %}
-        <div class="meme-text-overlay meme-text-bottom">{{ meme.bottom_text }}</div>
+        {% if meme.generated_image %}
+        <img src="{{ meme.generated_image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image">
+        {% elif meme.get_source_image_url %}
+        <img src="{{ meme.get_source_image_url }}" alt="Meme #{{ meme.pk }}" class="meme-image">
+        {% for overlay in meme.get_overlay_for_css %}
+        <div class="meme-text-overlay" style="{{ overlay.style }}{% if overlay.color %}color: {{ overlay.color }};{% endif %}{% if overlay.font_size %}font-size: {{ overlay.font_size }}px;{% endif %}">
+            {{ overlay.text }}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="meme-card-image" style="background: var(--meme-bg-light); display: flex; align-items: center; justify-content: center; color: var(--meme-text-light); min-height: 200px;">
+            No image
+        </div>
         {% endif %}
     </div>
 </div>
@@ -32,23 +39,22 @@ Optional context:
     <p class="meme-info-text">
         <strong>Created:</strong> {{ meme.created_at|date:"F d, Y g:i A" }}
     </p>
-    {% if meme.top_text %}
-    <p class="meme-info-text"><strong>Top text:</strong> {{ meme.top_text }}</p>
-    {% endif %}
-    {% if meme.bottom_text %}
-    <p class="meme-info-text"><strong>Bottom text:</strong> {{ meme.bottom_text }}</p>
-    {% endif %}
 </div>
 {% endif %}
 
 {% if show_actions %}
 <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-    <a href="{% url 'meme_maker:create' %}" class="meme-btn">
-        Create Another →
-    </a>
-    <a href="{{ meme.image.url }}" download class="meme-btn meme-btn-secondary">
+    <a href="{% url 'meme_maker:meme_download' meme.pk %}" class="meme-btn">
         Download Image
     </a>
+    {% if meme.template %}
+    <a href="{% url 'meme_maker:meme_editor' meme.template.pk %}" class="meme-btn meme-btn-secondary">
+        Create Another →
+    </a>
+    {% else %}
+    <a href="{% url 'meme_maker:template_list' %}" class="meme-btn meme-btn-secondary">
+        Browse Templates →
+    </a>
+    {% endif %}
 </div>
 {% endif %}
-

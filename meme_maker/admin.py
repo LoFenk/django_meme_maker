@@ -6,21 +6,21 @@ Provides admin interfaces for MemeTemplate, Meme, and Link models.
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import MemeTemplate, Meme, TemplateLink, MemeLink
+from .models import MemeTemplate, Meme, TemplateLink, MemeLink, TemplateFlag, MemeFlag
 
 
 @admin.register(MemeTemplate)
 class MemeTemplateAdmin(admin.ModelAdmin):
     """Admin interface for meme templates."""
     
-    list_display = ['id', 'title', 'image_preview', 'tags', 'meme_count', 'created_at']
-    list_filter = ['created_at']
+    list_display = ['id', 'title', 'image_preview', 'tags', 'nsfw', 'flagged', 'meme_count', 'created_at']
+    list_filter = ['created_at', 'nsfw', 'flagged']
     search_fields = ['title', 'tags']
-    readonly_fields = ['created_at', 'updated_at', 'image_preview_large']
+    readonly_fields = ['created_at', 'updated_at', 'flagged_at', 'image_preview_large']
     
     fieldsets = (
         (None, {
-            'fields': ('image', 'title', 'tags')
+            'fields': ('image', 'title', 'tags', 'nsfw', 'flagged', 'flagged_at')
         }),
         ('Preview', {
             'fields': ('image_preview_large',),
@@ -62,23 +62,20 @@ class MemeTemplateAdmin(admin.ModelAdmin):
 class MemeAdmin(admin.ModelAdmin):
     """Admin interface for memes."""
     
-    list_display = ['id', 'template_title', 'meme_preview', 'top_text_preview', 'bottom_text_preview', 'created_at']
-    list_filter = ['created_at', 'template']
-    search_fields = ['top_text', 'bottom_text', 'template__title']
-    readonly_fields = ['created_at', 'updated_at', 'meme_preview_large', 'text_overlays_display']
+    list_display = ['id', 'template_title', 'meme_preview', 'overlay_preview', 'nsfw', 'flagged', 'created_at']
+    list_filter = ['created_at', 'template', 'nsfw', 'flagged']
+    search_fields = ['template__title']
+    readonly_fields = ['created_at', 'updated_at', 'flagged_at', 'meme_preview_large', 'text_overlays_display']
     raw_id_fields = ['template']
     
     fieldsets = (
         (None, {
-            'fields': ('template',)
+            'fields': ('template', 'nsfw', 'flagged', 'flagged_at')
         }),
         ('Legacy Image Upload', {
             'fields': ('image',),
             'classes': ('collapse',),
             'description': 'Only use if not using a template'
-        }),
-        ('Text (Simple)', {
-            'fields': ('top_text', 'bottom_text')
         }),
         ('Text Overlays (Advanced)', {
             'fields': ('text_overlays', 'text_overlays_display'),
@@ -132,19 +129,14 @@ class MemeAdmin(admin.ModelAdmin):
         return '-'
     meme_preview_large.short_description = 'Meme Preview'
     
-    def top_text_preview(self, obj):
-        """Truncated top text for list display."""
-        if obj.top_text:
-            return obj.top_text[:30] + ('...' if len(obj.top_text) > 30 else '')
+    def overlay_preview(self, obj):
+        """Truncated overlay text for list display."""
+        overlays = obj.get_overlays()
+        if overlays:
+            text = overlays[0].get('text', '')
+            return text[:30] + ('...' if len(text) > 30 else '')
         return '-'
-    top_text_preview.short_description = 'Top'
-    
-    def bottom_text_preview(self, obj):
-        """Truncated bottom text for list display."""
-        if obj.bottom_text:
-            return obj.bottom_text[:30] + ('...' if len(obj.bottom_text) > 30 else '')
-        return '-'
-    bottom_text_preview.short_description = 'Bottom'
+    overlay_preview.short_description = 'Text'
     
     def text_overlays_display(self, obj):
         """Display text overlays as formatted JSON."""
@@ -244,7 +236,7 @@ class MemeLinkAdmin(admin.ModelAdmin):
     
     list_display = ['id', 'meme', 'content_type', 'object_id', 'link_type', 'created_at']
     list_filter = ['content_type', 'link_type', 'created_at']
-    search_fields = ['meme__top_text', 'meme__bottom_text', 'link_type']
+    search_fields = ['meme__template__title', 'link_type']
     readonly_fields = ['created_at']
     raw_id_fields = ['meme']
     
@@ -261,6 +253,26 @@ class MemeLinkAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(TemplateFlag)
+class TemplateFlagAdmin(admin.ModelAdmin):
+    """Admin interface for template flags."""
+    list_display = ['id', 'template', 'user', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['template__title', 'user__username']
+    readonly_fields = ['created_at']
+    raw_id_fields = ['template', 'user']
+
+
+@admin.register(MemeFlag)
+class MemeFlagAdmin(admin.ModelAdmin):
+    """Admin interface for meme flags."""
+    list_display = ['id', 'meme', 'user', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['meme__template__title', 'user__username']
+    readonly_fields = ['created_at']
+    raw_id_fields = ['meme', 'user']
 
 
 # Add inlines to the main admin classes

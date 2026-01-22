@@ -221,7 +221,6 @@ linking/filtering is skipped.
 | `/meme/<pk>/` | `meme_maker:meme_detail` | View a meme |
 | `/meme/<pk>/download/` | `meme_maker:meme_download` | Download meme image |
 | `/memes/` | `meme_maker:meme_list` | List all memes |
-| `/create/` | `meme_maker:create` | Legacy: direct meme creation |
 
 ## Data Models
 
@@ -396,18 +395,6 @@ if form.is_valid():
     meme.save()
 ```
 
-### MemeForm (Legacy)
-
-For direct meme creation without templates:
-
-```python
-from meme_maker import MemeForm
-
-form = MemeForm(request.POST, request.FILES)
-if form.is_valid():
-    meme = form.save()
-```
-
 ## Class-Based Views
 
 For more flexibility, use the class-based views:
@@ -417,7 +404,6 @@ from meme_maker.views import (
     MemeTemplateListView,
     MemeTemplateDetailView,
     MemeTemplateCreateView,
-    MemeCreateView,
     MemeDetailView,
     MemeListView,
 )
@@ -425,7 +411,6 @@ from meme_maker.views import (
 urlpatterns = [
     path('templates/', MemeTemplateListView.as_view(), name='templates'),
     path('templates/<int:pk>/', MemeTemplateDetailView.as_view(), name='template_detail'),
-    path('create/', MemeCreateView.as_view(), name='create'),
     path('meme/<int:pk>/', MemeDetailView.as_view(), name='detail'),
     path('list/', MemeListView.as_view(), name='list'),
 ]
@@ -639,13 +624,6 @@ twine upload dist/*
 - Python 3.10+
 - Django 4.2+
 - Pillow 9.0+
-
-## Backward Compatibility
-
-Existing memes created before the template bank update will continue to work:
-- Direct image uploads are still supported
-- Legacy `top_text` and `bottom_text` fields are preserved
-- Old URL patterns (`/create/`, `/detail/<pk>/`) still work
 
 ## License
 

@@ -13,27 +13,26 @@
 
 <div class="meme-display">
     <div class="meme-display-wrapper">
-        {# If we have a generated image, show that #}
         {% if meme.generated_image %}
         <img src="{{ meme.generated_image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
-        {% else %}
-        {# Otherwise show source with CSS overlay #}
+        {% elif meme.get_source_image_url %}
         <img src="{{ meme.get_source_image_url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
         {% for overlay in meme.get_overlay_for_css %}
-        <div class="meme-text-overlay meme-text-{{ overlay.position }}" style="{{ overlay.style }}{% if overlay.color %}color: {{ overlay.color }};{% endif %}">
+        <div class="meme-text-overlay" style="{{ overlay.style }}{% if overlay.color %}color: {{ overlay.color }};{% endif %}{% if overlay.font_size %}font-size: {{ overlay.font_size }}px;{% endif %}">
             {{ overlay.text }}
         </div>
-        {% empty %}
-        {# Legacy fallback #}
-        {% if meme.top_text %}
-        <div class="meme-text-overlay meme-text-top">{{ meme.top_text }}</div>
-        {% endif %}
-        {% if meme.bottom_text %}
-        <div class="meme-text-overlay meme-text-bottom">{{ meme.bottom_text }}</div>
-        {% endif %}
         {% endfor %}
+        {% else %}
+        <div class="meme-card-image" style="background: var(--meme-bg-light); display: flex; align-items: center; justify-content: center; color: var(--meme-text-light); min-height: 200px;">
+            No image
+        </div>
         {% endif %}
     </div>
+</div>
+
+<div style="margin: 0.5rem auto 0; max-width: 600px; display: flex; justify-content: center;">
+    {% url 'meme_maker:flag_meme' meme.pk as flag_url %}
+    {% include "meme_maker/components/report_disclaimer.html" with flag_url=flag_url extra_class="align-image" %}
 </div>
 
 <div class="meme-info">
@@ -94,13 +93,6 @@
     </p>
     {% endif %}
     
-    {% if meme.top_text %}
-    <p class="meme-info-text"><strong>Top text:</strong> {{ meme.top_text }}</p>
-    {% endif %}
-    {% if meme.bottom_text %}
-    <p class="meme-info-text"><strong>Bottom text:</strong> {{ meme.bottom_text }}</p>
-    {% endif %}
-    
     <div class="meme-btn-group" style="margin-top: 1.5rem;">
         <a href="{% url 'meme_maker:meme_download' meme.pk %}" class="meme-btn">
             📥 Download Meme
@@ -133,4 +125,3 @@
 <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/utils.js' %}"></script>
 <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/rating.js' %}"></script>
 {% endblock %}
-

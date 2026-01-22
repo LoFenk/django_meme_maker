@@ -6,7 +6,6 @@ Provides views for:
 - Meme editor (create memes from templates)
 - Meme display and download
 - Rating system for templates and memes
-- Legacy views for backward compatibility
 """
 
 import json
@@ -14,17 +13,17 @@ import mimetypes
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.views.generic import CreateView, DetailView, ListView
 from django.views.decorators.http import require_POST
 from django.core.files.storage import default_storage
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
+from django.utils import timezone
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-from .models import Meme, MemeTemplate, TemplateRating, MemeRating
-from .forms import (
-    MemeForm, MemeEditForm, MemeTemplateForm, 
-    MemeTemplateSearchForm, MemeEditorForm
-)
+from .models import Meme, MemeTemplate, TemplateRating, MemeRating, MemeFlag, TemplateFlag
+from .forms import MemeTemplateForm, MemeTemplateSearchForm, MemeEditorForm
 from .conf import meme_maker_settings
 
 
@@ -48,6 +47,57 @@ def resolve_linked_object(request):
         )
     request._meme_maker_linked_object = resolver(request)
     return request._meme_maker_linked_object
+
+
+def get_per_page(request, default=25):
+    """Get validated per-page value from query params."""
+    allowed = {10, 25, 50}
+    try:
+        per_page = int(request.GET.get('per_page', default))
+    except (TypeError, ValueError):
+        per_page = default
+    return per_page if per_page in allowed else default
+
+
+def get_redirect_back(request, fallback_url_name, **kwargs):
+    """Return a safe fallback redirect URL."""
+    return request.META.get('HTTP_REFERER') or reverse(fallback_url_name, kwargs=kwargs or None)
+
+
+def get_template_memes_queryset(template, linked_obj=None):
+    qs = template.memes.filter(flagged=False)
+    if linked_obj:
+        qs = qs.filter(
+            pk__in=Meme.objects.linked_to(linked_obj).values_list('pk', flat=True)
+        )
+    return qs
+
+
+def apply_template_memes_sort(qs, sort_key):
+    sort_key = (sort_key or 'recent').lower()
+    if sort_key == 'random':
+        return qs.order_by('?'), sort_key
+
+    from django.db.models import Case, When, F, FloatField, Value
+    from django.db.models.functions import Cast
+    qs = qs.annotate(
+        avg_rating=Case(
+            When(rating_count=0, then=Value(0.0)),
+            default=Cast(F('rating_sum'), FloatField()) / Cast(F('rating_count'), FloatField()),
+            output_field=FloatField()
+        )
+    )
+
+    if sort_key == 'best':
+        qs = qs.filter(rating_count__gte=5).order_by('-avg_rating', '-rating_count', '-created_at')
+    elif sort_key == 'popular':
+        qs = qs.filter(avg_rating__gte=3.0).order_by('-rating_count', '-avg_rating', '-created_at')
+    elif sort_key == 'worst':
+        qs = qs.filter(rating_count__gt=0).order_by('avg_rating', 'rating_count', 'created_at')
+    else:
+        sort_key = 'recent'
+        qs = qs.order_by('-created_at')
+    return qs, sort_key
 
 
 # =============================================================================
@@ -77,23 +127,41 @@ def template_list(request):
     form = MemeTemplateSearchForm(request.GET)
     query = request.GET.get('q', '').strip()
     order_by = request.GET.get('order', '-created')  # Default: newest first
+    per_page = get_per_page(request, default=25)
     
     # Valid ordering options
     valid_orders = ['rating', '-rating', 'created', '-created', 'title', '-title']
     if order_by not in valid_orders:
         order_by = '-created'
     
-    templates = MemeTemplate.search(query, order_by=order_by)
+    templates = MemeTemplate.search(query, order_by=order_by).filter(flagged=False)
+    from django.db.models import Count, Q
+    templates = templates.annotate(
+        unflagged_meme_count=Count('memes', filter=Q(memes__flagged=False))
+    )
     linked_obj = resolve_linked_object(request)
     if linked_obj:
         linked_ids = MemeTemplate.objects.linked_to(linked_obj).values_list('pk', flat=True)
         templates = templates.filter(pk__in=linked_ids)
+
+    paginator = Paginator(templates, per_page)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
     
     context = {
-        'templates': templates,
+        'templates': page_obj.object_list,
+        'page_obj': page_obj,
+        'is_paginated': paginator.num_pages > 1,
+        'total_count': paginator.count,
         'search_form': form,
         'query': query,
         'order_by': order_by,
+        'per_page': per_page,
         'title': 'Template Bank',
         'page_type': 'template_list',
     }
@@ -111,18 +179,23 @@ def template_detail(request, pk):
     - "Make my own" button → links to meme editor
     - Star rating widget
     """
-    template = get_object_or_404(MemeTemplate, pk=pk)
+    from django.db.models import Count, Q
+    template = get_object_or_404(
+        MemeTemplate.objects.annotate(
+            unflagged_meme_count=Count('memes', filter=Q(memes__flagged=False))
+        ),
+        pk=pk,
+    )
+    if template.flagged:
+        raise Http404
     linked_obj = resolve_linked_object(request)
     if linked_obj and not template.is_linked_to(linked_obj):
         raise Http404
     
-    # Get recent memes made from this template
-    recent_memes = template.memes.all()
-    if linked_obj:
-        recent_memes = recent_memes.filter(
-            pk__in=Meme.objects.linked_to(linked_obj).values_list('pk', flat=True)
-        )
-    recent_memes = recent_memes[:6]
+    sort_key = request.GET.get('sort', 'recent')
+    memes_qs = get_template_memes_queryset(template, linked_obj=linked_obj)
+    memes_qs, sort_key = apply_template_memes_sort(memes_qs, sort_key)
+    recent_memes = memes_qs[:6]
     
     # Check if user has already rated this template
     user_rating = None
@@ -138,6 +211,7 @@ def template_detail(request, pk):
     context = {
         'template': template,
         'recent_memes': recent_memes,
+        'memes_sort': sort_key,
         'user_rating': user_rating,
         'title': template.title,
         'page_type': 'template_detail',
@@ -145,6 +219,25 @@ def template_detail(request, pk):
     context.update(get_meme_maker_context())
     
     return render(request, 'meme_maker/template_detail.html', context)
+
+
+def template_memes_partial(request, pk):
+    template = get_object_or_404(MemeTemplate, pk=pk)
+    if template.flagged:
+        raise Http404
+    linked_obj = resolve_linked_object(request)
+    if linked_obj and not template.is_linked_to(linked_obj):
+        raise Http404
+
+    sort_key = request.GET.get('sort', 'recent')
+    memes_qs = get_template_memes_queryset(template, linked_obj=linked_obj)
+    memes_qs, sort_key = apply_template_memes_sort(memes_qs, sort_key)
+    context = {
+        'template': template,
+        'recent_memes': memes_qs[:6],
+        'memes_sort': sort_key,
+    }
+    return render(request, 'meme_maker/partials/template_memes.html', context)
 
 
 def template_upload(request):
@@ -183,7 +276,7 @@ def template_download(request, pk):
     
     Returns the template image file as a download.
     """
-    template = get_object_or_404(MemeTemplate, pk=pk)
+    template = get_object_or_404(MemeTemplate, pk=pk, flagged=False)
     linked_obj = resolve_linked_object(request)
     if linked_obj and not template.is_linked_to(linked_obj):
         raise Http404
@@ -225,7 +318,7 @@ def meme_editor(request, template_pk):
     
     Allows users to add text overlays to a template and save as a new meme.
     """
-    template = get_object_or_404(MemeTemplate, pk=template_pk)
+    template = get_object_or_404(MemeTemplate, pk=template_pk, flagged=False)
     
     if request.method == 'POST':
         form = MemeEditorForm(request.POST)
@@ -237,13 +330,7 @@ def meme_editor(request, template_pk):
             overlays = form.get_overlays()
             meme.set_overlays(overlays)
             
-            # Also set legacy fields for backward compatibility
-            for overlay in overlays:
-                if overlay.get('position') == 'top' and not meme.top_text:
-                    meme.top_text = overlay.get('text', '')
-                elif overlay.get('position') == 'bottom' and not meme.bottom_text:
-                    meme.bottom_text = overlay.get('text', '')
-            
+            meme.nsfw = form.cleaned_data.get('nsfw', False)
             meme.save()
             linked_obj = resolve_linked_object(request)
             if linked_obj:
@@ -275,7 +362,7 @@ def meme_detail(request, pk):
     Shows the meme with text overlays and provides download option.
     Includes star rating widget.
     """
-    meme = get_object_or_404(Meme, pk=pk)
+    meme = get_object_or_404(Meme, pk=pk, flagged=False)
     linked_obj = resolve_linked_object(request)
     if linked_obj and not meme.is_linked_to(linked_obj):
         raise Http404
@@ -308,6 +395,7 @@ def meme_list(request):
     Supports ordering by rating, date.
     """
     order_by = request.GET.get('order', '-created')  # Default: newest first
+    per_page = get_per_page(request, default=25)
     
     # Valid ordering options
     valid_orders = ['rating', '-rating', 'created', '-created']
@@ -319,6 +407,7 @@ def meme_list(request):
         memes = Meme.objects.linked_to(linked_obj)
     else:
         memes = Meme.objects.all()
+    memes = memes.filter(flagged=False)
     
     # Apply ordering
     if order_by == 'rating' or order_by == '-rating':
@@ -341,9 +430,22 @@ def meme_list(request):
     else:  # -created
         memes = memes.order_by('-created_at')
     
+    paginator = Paginator(memes, per_page)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
     context = {
-        'memes': memes,
+        'memes': page_obj.object_list,
+        'page_obj': page_obj,
+        'is_paginated': paginator.num_pages > 1,
+        'total_count': paginator.count,
         'order_by': order_by,
+        'per_page': per_page,
         'title': 'All Memes',
         'page_type': 'meme_list',
     }
@@ -401,6 +503,14 @@ def _ensure_session(request):
     return request.session.session_key
 
 
+def _user_flag_count_today(user):
+    today = timezone.localdate()
+    return (
+        TemplateFlag.objects.filter(user=user, created_at__date=today).count() +
+        MemeFlag.objects.filter(user=user, created_at__date=today).count()
+    )
+
+
 @require_POST
 def rate_template(request, pk):
     """
@@ -409,7 +519,7 @@ def rate_template(request, pk):
     POST data: { "stars": 1-5 }
     Returns: { "success": true, "average_rating": X.X, "rating_count": N, "user_rating": N }
     """
-    template = get_object_or_404(MemeTemplate, pk=pk)
+    template = get_object_or_404(MemeTemplate, pk=pk, flagged=False)
     linked_obj = resolve_linked_object(request)
     if linked_obj and not template.is_linked_to(linked_obj):
         raise Http404
@@ -459,7 +569,7 @@ def rate_meme(request, pk):
     POST data: { "stars": 1-5 }
     Returns: { "success": true, "average_rating": X.X, "rating_count": N, "user_rating": N }
     """
-    meme = get_object_or_404(Meme, pk=pk)
+    meme = get_object_or_404(Meme, pk=pk, flagged=False)
     linked_obj = resolve_linked_object(request)
     if linked_obj and not meme.is_linked_to(linked_obj):
         raise Http404
@@ -502,42 +612,51 @@ def rate_meme(request, pk):
 
 
 # =============================================================================
-# LEGACY VIEWS (Backward Compatibility)
+# FLAGGING VIEWS
 # =============================================================================
 
-def create_meme(request):
-    """
-    Legacy view to create a meme with direct image upload.
-    
-    Kept for backward compatibility. New users should use the
-    template bank workflow instead.
-    """
-    if request.method == 'POST':
-        form = MemeForm(request.POST, request.FILES)
-        if form.is_valid():
-            meme = form.save()
-            linked_obj = resolve_linked_object(request)
-            if linked_obj:
-                meme.link_to(linked_obj)
-            messages.success(request, 'Meme created successfully!')
-            return redirect('meme_maker:meme_detail', pk=meme.pk)
-    else:
-        form = MemeForm()
-    
-    context = {
-        'form': form,
-        'title': 'Create Meme',
-        'page_type': 'create',
-    }
-    context.update(get_meme_maker_context())
-    
-    return render(request, 'meme_maker/create.html', context)
+@login_required
+@require_POST
+def flag_template(request, pk):
+    template = get_object_or_404(MemeTemplate, pk=pk)
+    if template.flagged:
+        messages.info(request, 'This template is already flagged for review.')
+        return redirect(get_redirect_back(request, 'meme_maker:template_list'))
+    if TemplateFlag.objects.filter(template=template, user=request.user).exists():
+        messages.info(request, 'You already flagged this template.')
+        return redirect(get_redirect_back(request, 'meme_maker:template_detail', pk=template.pk))
+    if _user_flag_count_today(request.user) >= 5:
+        messages.error(request, 'Daily flag limit reached. Please contact an admin if you need more removed.')
+        return redirect(get_redirect_back(request, 'meme_maker:template_detail', pk=template.pk))
+
+    TemplateFlag.objects.create(template=template, user=request.user)
+    template.flagged = True
+    template.flagged_at = timezone.now()
+    template.save(update_fields=['flagged', 'flagged_at'])
+    messages.success(request, 'Thanks for the report. This template is now flagged for review.')
+    return redirect(get_redirect_back(request, 'meme_maker:template_list'))
 
 
-# Alias for backward compatibility
-def detail(request, pk):
-    """Alias for meme_detail (backward compatibility)."""
-    return meme_detail(request, pk)
+@login_required
+@require_POST
+def flag_meme(request, pk):
+    meme = get_object_or_404(Meme, pk=pk)
+    if meme.flagged:
+        messages.info(request, 'This meme is already flagged for review.')
+        return redirect(get_redirect_back(request, 'meme_maker:meme_list'))
+    if MemeFlag.objects.filter(meme=meme, user=request.user).exists():
+        messages.info(request, 'You already flagged this meme.')
+        return redirect(get_redirect_back(request, 'meme_maker:meme_detail', pk=meme.pk))
+    if _user_flag_count_today(request.user) >= 5:
+        messages.error(request, 'Daily flag limit reached. Please contact an admin if you need more removed.')
+        return redirect(get_redirect_back(request, 'meme_maker:meme_detail', pk=meme.pk))
+
+    MemeFlag.objects.create(meme=meme, user=request.user)
+    meme.flagged = True
+    meme.flagged_at = timezone.now()
+    meme.save(update_fields=['flagged', 'flagged_at'])
+    messages.success(request, 'Thanks for the report. This meme is now flagged for review.')
+    return redirect(get_redirect_back(request, 'meme_maker:meme_list'))
 
 
 # =============================================================================
@@ -549,7 +668,10 @@ class MemeTemplateListView(ListView):
     model = MemeTemplate
     template_name = 'meme_maker/template_list.html'
     context_object_name = 'templates'
-    paginate_by = 12
+    paginate_by = 25
+
+    def get_paginate_by(self, queryset):
+        return get_per_page(self.request, default=self.paginate_by)
     
     def get_queryset(self):
         query = self.request.GET.get('q', '').strip()
@@ -557,6 +679,7 @@ class MemeTemplateListView(ListView):
             qs = MemeTemplate.search(query)
         else:
             qs = MemeTemplate.objects.all()
+        qs = qs.filter(flagged=False)
         linked_obj = resolve_linked_object(self.request)
         if linked_obj:
             linked_ids = MemeTemplate.objects.linked_to(linked_obj).values_list('pk', flat=True)
@@ -569,6 +692,9 @@ class MemeTemplateListView(ListView):
         context['query'] = self.request.GET.get('q', '')
         context['title'] = 'Template Bank'
         context['page_type'] = 'template_list'
+        context['per_page'] = self.get_paginate_by(self.get_queryset())
+        if 'paginator' in context:
+            context['total_count'] = context['paginator'].count
         context.update(get_meme_maker_context())
         return context
 
@@ -582,9 +708,11 @@ class MemeTemplateDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         linked_obj = resolve_linked_object(self.request)
+        if self.object.flagged:
+            raise Http404
         if linked_obj and not self.object.is_linked_to(linked_obj):
             raise Http404
-        recent_memes = self.object.memes.all()
+        recent_memes = self.object.memes.filter(flagged=False)
         if linked_obj:
             recent_memes = recent_memes.filter(
                 pk__in=Meme.objects.linked_to(linked_obj).values_list('pk', flat=True)
@@ -621,28 +749,6 @@ class MemeTemplateCreateView(CreateView):
         return reverse('meme_maker:meme_editor', kwargs={'template_pk': self.object.pk})
 
 
-class MemeCreateView(CreateView):
-    """Legacy class-based view for creating memes."""
-    model = Meme
-    form_class = MemeForm
-    template_name = 'meme_maker/create.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Meme'
-        context['page_type'] = 'create'
-        context.update(get_meme_maker_context())
-        return context
-    
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        linked_obj = resolve_linked_object(self.request)
-        if linked_obj:
-            self.object.link_to(linked_obj)
-        messages.success(self.request, 'Meme created successfully!')
-        return response
-
-
 class MemeDetailView(DetailView):
     """Class-based view for viewing a single meme."""
     model = Meme
@@ -652,6 +758,8 @@ class MemeDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         linked_obj = resolve_linked_object(self.request)
+        if self.object.flagged:
+            raise Http404
         if linked_obj and not self.object.is_linked_to(linked_obj):
             raise Http404
         context['title'] = f'Meme #{self.object.pk}'
@@ -665,18 +773,26 @@ class MemeListView(ListView):
     model = Meme
     template_name = 'meme_maker/meme_list.html'
     context_object_name = 'memes'
-    paginate_by = 12
+    paginate_by = 25
+
+    def get_paginate_by(self, queryset):
+        return get_per_page(self.request, default=self.paginate_by)
 
     def get_queryset(self):
         linked_obj = resolve_linked_object(self.request)
         if linked_obj:
-            return Meme.objects.linked_to(linked_obj)
-        return Meme.objects.all()
+            qs = Meme.objects.linked_to(linked_obj)
+        else:
+            qs = Meme.objects.all()
+        return qs.filter(flagged=False)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'All Memes'
         context['page_type'] = 'meme_list'
+        context['per_page'] = self.get_paginate_by(self.get_queryset())
+        if 'paginator' in context:
+            context['total_count'] = context['paginator'].count
         context.update(get_meme_maker_context())
         return context
 

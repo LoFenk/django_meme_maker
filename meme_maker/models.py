@@ -59,6 +59,7 @@ import json
 import io
 import uuid
 from django.db import models
+from django.conf import settings
 from django.urls import reverse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -343,6 +344,19 @@ class MemeTemplate(LinkableMixin, RatingMixin, models.Model):
         blank=True,
         help_text="Comma-separated tags for searching (e.g., 'funny, reaction, cat')"
     )
+    nsfw = models.BooleanField(
+        default=False,
+        help_text="Mark this template as not safe for work"
+    )
+    flagged = models.BooleanField(
+        default=False,
+        help_text="Flagged for review"
+    )
+    flagged_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this template was flagged"
+    )
     
     # Rating fields
     rating_sum = models.PositiveIntegerField(
@@ -481,24 +495,18 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
         help_text="The template this meme was created from"
     )
     
-    # Legacy fields for backward compatibility
-    # These are kept for existing memes that don't use templates
-    image = models.ImageField(
-        upload_to=meme_upload_path,
-        #storage=default_storage,
+    nsfw = models.BooleanField(
+        default=False,
+        help_text="Mark this meme as not safe for work"
+    )
+    flagged = models.BooleanField(
+        default=False,
+        help_text="Flagged for review"
+    )
+    flagged_at = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="Legacy: Direct image upload (use template instead)"
-    )
-    top_text = models.CharField(
-        max_length=200, 
-        blank=True, 
-        help_text="Legacy: Text at top (use text_overlays instead)"
-    )
-    bottom_text = models.CharField(
-        max_length=200, 
-        blank=True, 
-        help_text="Legacy: Text at bottom (use text_overlays instead)"
+        help_text="When this meme was flagged"
     )
     
     # New fields for template-based memes
@@ -541,7 +549,8 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
     def __str__(self):
         if self.template:
             return f"Meme from '{self.template.title}' #{self.id}"
-        text_preview = self.top_text or self.bottom_text or 'No text'
+        overlays = self.get_overlays()
+        text_preview = overlays[0].get('text', '') if overlays else 'No text'
         return f"Meme {self.id} - {text_preview[:30]}..."
     
     def get_absolute_url(self):
@@ -551,7 +560,7 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
         """Get the source image (template or direct upload)."""
         if self.template and self.template.image:
             return self.template.image
-        return self.image
+        return None
     
     def get_source_image_url(self):
         """Get URL for the source image."""
@@ -586,21 +595,7 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
         """
         overlays = self.get_overlays()
         if not overlays:
-            # Fall back to legacy top/bottom text
-            result = []
-            if self.top_text:
-                result.append({
-                    'text': self.top_text,
-                    'position': 'top',
-                    'style': 'top: 1rem;'
-                })
-            if self.bottom_text:
-                result.append({
-                    'text': self.bottom_text,
-                    'position': 'bottom',
-                    'style': 'bottom: 1rem;'
-                })
-            return result
+            return []
         
         result = []
         for overlay in overlays:
@@ -659,27 +654,6 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
             
             # Get overlays
             overlays = self.get_overlays()
-            if not overlays:
-                # Use legacy text
-                overlays = []
-                if self.top_text:
-                    overlays.append({
-                        'text': self.top_text,
-                        'position': 'top',
-                        'color': '#FFFFFF',
-                        'stroke_color': '#000000',
-                        'uppercase': True,
-                        'font_size': 48,
-                    })
-                if self.bottom_text:
-                    overlays.append({
-                        'text': self.bottom_text,
-                        'position': 'bottom',
-                        'color': '#FFFFFF',
-                        'stroke_color': '#000000',
-                        'uppercase': True,
-                        'font_size': 48,
-                    })
             
             # Font loading helper
             def load_font(size):
@@ -876,13 +850,8 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
         # First save to get a PK if new
         super().save(*args, **kwargs)
         
-        # Generate composite image
-        # Only regenerate if we have overlays or legacy text
-        should_generate = (
-            self.get_overlays() or 
-            self.top_text or 
-            self.bottom_text
-        ) and self.get_source_image()
+        # Generate composite image if overlays exist
+        should_generate = self.get_overlays() and self.get_source_image()
         
         if should_generate:
             result = self.generate_image()
@@ -903,12 +872,11 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
     
     def delete(self, *args, **kwargs):
         """Override delete to also remove image files from storage."""
-        image_path = self.image.name if self.image else None
         generated_path = self.generated_image.name if self.generated_image else None
         
         super().delete(*args, **kwargs)
         
-        for path in [image_path, generated_path]:
+        for path in [generated_path]:
             if path:
                 try:
                     default_storage.delete(path)
@@ -980,6 +948,58 @@ class MemeRating(models.Model):
     
     def __str__(self):
         return f"Meme #{self.meme.pk} - {self.stars} stars"
+
+
+# =============================================================================
+# FLAGGING MODELS
+# =============================================================================
+
+class TemplateFlag(models.Model):
+    """User flag for a meme template."""
+    template = models.ForeignKey(
+        MemeTemplate,
+        on_delete=models.CASCADE,
+        related_name='flags'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='template_flags'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('template', 'user')
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"Flag on template {self.template_id} by {self.user_id}"
+
+
+class MemeFlag(models.Model):
+    """User flag for a meme."""
+    meme = models.ForeignKey(
+        Meme,
+        on_delete=models.CASCADE,
+        related_name='flags'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='meme_flags'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('meme', 'user')
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"Flag on meme {self.meme_id} by {self.user_id}"
 
 
 # =============================================================================

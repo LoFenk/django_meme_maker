@@ -6,7 +6,6 @@
     <a href="{% url 'meme_maker:template_list' %}" {% if page_type == 'template_list' %}class="active"{% endif %}>🔍 Browse Templates</a>
     <a href="{% url 'meme_maker:template_upload' %}" {% if page_type == 'template_upload' %}class="active"{% endif %}>📤 Upload Template</a>
     <a href="{% url 'meme_maker:meme_list' %}" {% if page_type == 'meme_list' %}class="active"{% endif %}>🎭 All Memes</a>
-    <a href="{% url 'meme_maker:create' %}" {% if page_type == 'create' %}class="active"{% endif %}>➕ Quick Create</a>
 </nav>
 {% endif %}
 
@@ -17,4 +16,3 @@
     {% endfor %}
 </div>
 {% endif %}
-
