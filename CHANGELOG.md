@@ -5,6 +5,25 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-22
+
+### Added
+- **Linked object resolver**: Optional `MEME_MAKER['LINKED_OBJECT_RESOLVER']` hook to auto-link and scope templates/memes by request context
+- **Scoped access enforcement**: Detail, download, and rating endpoints now 404 when scoped objects are not linked
+- **Per-page controls**: Pagination with 10/25/50 per-page selector for template and meme lists
+- **NSFW flags**: `nsfw` fields for templates and memes, exposed in forms and admin
+- **Flagging system**: User flagging with daily limit, admin flags view, and removal from circulation
+- **Template meme filters**: "Memes using this template" with Recent/Best/Popular/Worst/Random sorting and AJAX refresh
+
+### Changed
+- **Breaking**: Removed legacy direct-upload workflow, URLs, forms, and fields (`image`, `top_text`, `bottom_text`)
+- **Detail displays**: Use overlays-only rendering for memes, no legacy text fallbacks
+- **Template counts**: Count only unflagged memes in template displays
+
+### Fixed
+- **Resolver performance**: Cached linked object resolver result per request
+- **Scoped downloads/ratings**: Prevented cross-scope access by ID
+
 ## [1.2.4] - 2026-01-06
 
 ### Changed
@@ -91,4 +110,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Storage-agnostic file handling
 - Template tags and components
 - Context processors for settings
-
