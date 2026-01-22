@@ -1,0 +1,155 @@
+{% extends meme_maker_base_template|default:"meme_maker/tech/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{% include "meme_maker/partials/extra_head.html" %}
+{% endblock %}
+
+{% block header_title %}{{ template.title }}{% endblock %}
+{% block header_subtitle %}Meme Template{% endblock %}
+
+{% block content %}
+{% include meme_maker_template_base|add:"/partials/nav.html" %}
+
+<div class="template-hero">
+    <div class="template-preview">
+        <img src="{{ template.image.url }}" alt="{{ template.title }}">
+        {% url 'meme_maker:flag_template' template.pk as flag_url %}
+        {% include meme_maker_template_base|add:"/components/report_disclaimer.html" with flag_url=flag_url extra_class="align-image" %}
+    </div>
+    
+    <div class="template-info">
+        <h2>{{ template.title }}</h2>
+        
+        {# Rating Widget - Inline #}
+        <div style="margin-bottom: 1.5rem;">
+            {% csrf_token %}
+            <div class="meme-rating" 
+                 data-rating-widget 
+                 data-type="template" 
+                 data-pk="{{ template.pk }}"
+                 data-rate-url="{% url 'meme_maker:rate_template' pk=template.pk %}">
+                
+                {# Display current rating #}
+                <div class="meme-rating-display" data-rating-display>
+                    {% with avg=template.get_average_rating %}
+                    <span class="star{% if avg < 1 %} empty{% endif %}">{% if avg >= 1 %}★{% else %}☆{% endif %}</span>
+                    <span class="star{% if avg < 2 %} empty{% endif %}">{% if avg >= 2 %}★{% else %}☆{% endif %}</span>
+                    <span class="star{% if avg < 3 %} empty{% endif %}">{% if avg >= 3 %}★{% else %}☆{% endif %}</span>
+                    <span class="star{% if avg < 4 %} empty{% endif %}">{% if avg >= 4 %}★{% else %}☆{% endif %}</span>
+                    <span class="star{% if avg < 5 %} empty{% endif %}">{% if avg >= 5 %}★{% else %}☆{% endif %}</span>
+                    {% endwith %}
+                </div>
+                
+                <span class="meme-rating-text" data-rating-text>
+                    {{ template.get_rating_display }}
+                </span>
+                
+                {# Interactive rating stars #}
+                <div class="meme-rating-stars" data-rating-input style="margin-left: 1rem;">
+                    <input type="radio" name="rating-template-{{ template.pk }}" id="star5-template-{{ template.pk }}" value="5" {% if user_rating == 5 %}checked{% endif %}>
+                    <label for="star5-template-{{ template.pk }}" data-value="5" title="Rate 5 stars">★</label>
+                    
+                    <input type="radio" name="rating-template-{{ template.pk }}" id="star4-template-{{ template.pk }}" value="4" {% if user_rating == 4 %}checked{% endif %}>
+                    <label for="star4-template-{{ template.pk }}" data-value="4" title="Rate 4 stars">★</label>
+                    
+                    <input type="radio" name="rating-template-{{ template.pk }}" id="star3-template-{{ template.pk }}" value="3" {% if user_rating == 3 %}checked{% endif %}>
+                    <label for="star3-template-{{ template.pk }}" data-value="3" title="Rate 3 stars">★</label>
+                    
+                    <input type="radio" name="rating-template-{{ template.pk }}" id="star2-template-{{ template.pk }}" value="2" {% if user_rating == 2 %}checked{% endif %}>
+                    <label for="star2-template-{{ template.pk }}" data-value="2" title="Rate 2 stars">★</label>
+                    
+                    <input type="radio" name="rating-template-{{ template.pk }}" id="star1-template-{{ template.pk }}" value="1" {% if user_rating == 1 %}checked{% endif %}>
+                    <label for="star1-template-{{ template.pk }}" data-value="1" title="Rate 1 star">★</label>
+                </div>
+            </div>
+        </div>
+        
+        {% if template.tags %}
+        <div class="meme-tags" style="margin-bottom: 1.5rem;">
+            {% for tag in template.get_tags_list %}
+            <a href="{% url 'meme_maker:template_list' %}?q={{ tag }}" class="meme-tag">{{ tag }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <p class="meme-info-text" style="margin-bottom: 1.5rem;">
+            {{ template.unflagged_meme_count }} meme{{ template.unflagged_meme_count|pluralize }} created from this template
+        </p>
+        
+        <div class="meme-btn-group" style="justify-content: flex-start;">
+            <a href="{% url 'meme_maker:meme_editor' template.pk %}" class="meme-btn">
+                ✨ Make My Own
+            </a>
+            <a href="{% url 'meme_maker:template_download' template.pk %}" class="meme-btn meme-btn-secondary">
+                📥 Download Template
+            </a>
+        </div>
+        
+        <p class="meme-card-meta" style="margin-top: 2rem;">
+            Added {{ template.created_at|date:"F d, Y" }}
+        </p>
+    </div>
+</div>
+
+<div style="margin-top: 3rem;">
+    <div class="meme-sort-bar" style="margin-bottom: 1rem;">
+        <div>
+            <label for="template-meme-sort">Filter:</label>
+            <div class="meme-filter-buttons">
+                <button type="button" class="meme-filter-btn{% if memes_sort == 'recent' %} active{% endif %}" data-sort="recent">Recent</button>
+                <button type="button" class="meme-filter-btn{% if memes_sort == 'best' %} active{% endif %}" data-sort="best">Best</button>
+                <button type="button" class="meme-filter-btn{% if memes_sort == 'popular' %} active{% endif %}" data-sort="popular">Popular</button>
+                <button type="button" class="meme-filter-btn{% if memes_sort == 'worst' %} active{% endif %}" data-sort="worst">Worst</button>
+                <button type="button" class="meme-filter-btn{% if memes_sort == 'random' %} active{% endif %}" data-sort="random">Random</button>
+            </div>
+        </div>
+    </div>
+    <div id="template-memes-container">
+        {% include meme_maker_template_base|add:"/partials/template_memes.html" %}
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 2rem;">
+    <a href="{% url 'meme_maker:template_list' %}" class="meme-btn meme-btn-secondary">
+        ← Back to Template Bank
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/utils.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/rating.js' %}"></script>
+<script>
+    (function () {
+        var container = document.getElementById('template-memes-container');
+        var buttons = document.querySelectorAll('.meme-filter-btn');
+        if (!container || !buttons.length) {
+            return;
+        }
+
+        function setActive(sort) {
+            buttons.forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.sort === sort);
+            });
+        }
+
+        buttons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var sort = btn.dataset.sort;
+                var url = new URL("{% url 'meme_maker:template_memes_partial' template.pk %}", window.location.origin);
+                url.searchParams.set('sort', sort);
+                fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (response) { return response.text(); })
+                    .then(function (html) {
+                        container.innerHTML = html;
+                        setActive(sort);
+                    })
+                    .catch(function () {
+                        window.location = url.toString();
+                    });
+            });
+        });
+    })();
+</script>
+{% endblock %}

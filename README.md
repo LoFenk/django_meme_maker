@@ -153,8 +153,38 @@ MEME_MAKER = {
     # Optional linked object resolver for scoping templates/memes
     # Accepts a dotted path or callable that receives request
     'LINKED_OBJECT_RESOLVER': None,
+
+    # Optional themed template set name
+    # Looks for templates in meme_maker/<TEMPLATE_SET>/... with fallback to defaults
+    'TEMPLATE_SET': None,
 }
 ```
+
+### Template Sets (Themed Frontends)
+
+To customize the UI, copy the default set and point `TEMPLATE_SET` at your folder:
+
+```
+meme_maker/templates/meme_maker/default/...
+```
+
+Example:
+
+```python
+MEME_MAKER = {
+    'TEMPLATE_SET': 'default',
+}
+```
+
+Create your own set by copying `meme_maker/templates/meme_maker/default` into a new
+folder (e.g., `meme_maker/templates/meme_maker/modern`) and edit the templates there.
+
+Included sets:
+- `default`: the standard look and feel
+- `compact`: tighter spacing for denser layouts
+- `modern`: rounded cards and soft gradients
+- `tech`: monospace, grid background, crisp borders
+- `classic`: serif typography with warm tones
 
 ### Watermark Configuration
 
@@ -349,6 +379,29 @@ MEME_MAKER = {
 ```
 
 The `extra_head` and `extra_js` blocks allow meme_maker to inject its CSS and JavaScript when using your custom base template.
+
+#### Custom Base + Template Sets
+
+If you use a custom `BASE_TEMPLATE` and also set `TEMPLATE_SET`, meme_maker will still inject
+the theme CSS into your `extra_head` block. To make the theme styling apply, your base
+layout must add the matching theme class on the `<body>` (or a top-level wrapper).
+
+Example:
+
+```html
+<body class="meme-theme-compact">
+    {% block content %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+```
+
+Theme class names:
+- `meme-theme-compact`
+- `meme-theme-modern`
+- `meme-theme-tech`
+- `meme-theme-classic`
+
+If you prefer, you can also add the class to your main wrapper element instead of `<body>`.
 
 ### Option 3: Include Components in Your Templates
 

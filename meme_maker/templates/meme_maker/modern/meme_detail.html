@@ -1,0 +1,127 @@
+{% extends meme_maker_base_template|default:"meme_maker/modern/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{% include "meme_maker/partials/extra_head.html" %}
+{% endblock %}
+
+{% block header_title %}Your Meme{% endblock %}
+{% block header_subtitle %}Meme #{{ meme.pk }}{% endblock %}
+
+{% block content %}
+{% include meme_maker_template_base|add:"/partials/nav.html" %}
+
+<div class="meme-display">
+    <div class="meme-display-wrapper">
+        {% if meme.generated_image %}
+        <img src="{{ meme.generated_image.url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
+        {% elif meme.get_source_image_url %}
+        <img src="{{ meme.get_source_image_url }}" alt="Meme #{{ meme.pk }}" class="meme-image" id="memeImage">
+        {% for overlay in meme.get_overlay_for_css %}
+        <div class="meme-text-overlay" style="{{ overlay.style }}{% if overlay.color %}color: {{ overlay.color }};{% endif %}{% if overlay.font_size %}font-size: {{ overlay.font_size }}px;{% endif %}">
+            {{ overlay.text }}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="meme-card-image" style="background: var(--meme-bg-light); display: flex; align-items: center; justify-content: center; color: var(--meme-text-light); min-height: 200px;">
+            No image
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="margin: 0.5rem auto 0; max-width: 600px; display: flex; justify-content: center;">
+    {% url 'meme_maker:flag_meme' meme.pk as flag_url %}
+    {% include meme_maker_template_base|add:"/components/report_disclaimer.html" with flag_url=flag_url extra_class="align-image" %}
+</div>
+
+<div class="meme-info">
+    {# Rating Widget - Inline #}
+    <div style="margin-bottom: 1.5rem;">
+        {% csrf_token %}
+        <div class="meme-rating" 
+             data-rating-widget 
+             data-type="meme" 
+             data-pk="{{ meme.pk }}"
+             data-rate-url="{% url 'meme_maker:rate_meme' pk=meme.pk %}">
+            
+            {# Display current rating #}
+            <div class="meme-rating-display" data-rating-display>
+                {% with avg=meme.get_average_rating %}
+                <span class="star{% if avg < 1 %} empty{% endif %}">{% if avg >= 1 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 2 %} empty{% endif %}">{% if avg >= 2 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 3 %} empty{% endif %}">{% if avg >= 3 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 4 %} empty{% endif %}">{% if avg >= 4 %}★{% else %}☆{% endif %}</span>
+                <span class="star{% if avg < 5 %} empty{% endif %}">{% if avg >= 5 %}★{% else %}☆{% endif %}</span>
+                {% endwith %}
+            </div>
+            
+            <span class="meme-rating-text" data-rating-text>
+                {{ meme.get_rating_display }}
+            </span>
+            
+            {# Interactive rating stars #}
+            <div class="meme-rating-stars" data-rating-input style="margin-left: 1rem;">
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star5-meme-{{ meme.pk }}" value="5" {% if user_rating == 5 %}checked{% endif %}>
+                <label for="star5-meme-{{ meme.pk }}" data-value="5" title="Rate 5 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star4-meme-{{ meme.pk }}" value="4" {% if user_rating == 4 %}checked{% endif %}>
+                <label for="star4-meme-{{ meme.pk }}" data-value="4" title="Rate 4 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star3-meme-{{ meme.pk }}" value="3" {% if user_rating == 3 %}checked{% endif %}>
+                <label for="star3-meme-{{ meme.pk }}" data-value="3" title="Rate 3 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star2-meme-{{ meme.pk }}" value="2" {% if user_rating == 2 %}checked{% endif %}>
+                <label for="star2-meme-{{ meme.pk }}" data-value="2" title="Rate 2 stars">★</label>
+                
+                <input type="radio" name="rating-meme-{{ meme.pk }}" id="star1-meme-{{ meme.pk }}" value="1" {% if user_rating == 1 %}checked{% endif %}>
+                <label for="star1-meme-{{ meme.pk }}" data-value="1" title="Rate 1 star">★</label>
+            </div>
+        </div>
+    </div>
+    
+    <p class="meme-info-text">
+        <strong>Created:</strong> {{ meme.created_at|date:"F d, Y g:i A" }}
+    </p>
+    
+    {% if meme.template %}
+    <p class="meme-info-text">
+        <strong>Template:</strong> 
+        <a href="{% url 'meme_maker:template_detail' meme.template.pk %}" style="color: var(--meme-primary);">
+            {{ meme.template.title }}
+        </a>
+    </p>
+    {% endif %}
+    
+    <div class="meme-btn-group" style="margin-top: 1.5rem;">
+        <a href="{% url 'meme_maker:meme_download' meme.pk %}" class="meme-btn">
+            📥 Download Meme
+        </a>
+        {% if meme.template %}
+        <a href="{% url 'meme_maker:meme_editor' meme.template.pk %}" class="meme-btn meme-btn-secondary">
+            ✨ Create Another
+        </a>
+        {% else %}
+        <a href="{% url 'meme_maker:template_list' %}" class="meme-btn meme-btn-secondary">
+            🔍 Browse Templates
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{# Share URL #}
+<div style="margin-top: 2rem; text-align: center;">
+    <p class="meme-form-help">Share this meme:</p>
+    <input type="text" 
+           class="meme-form-control" 
+           value="{{ request.build_absolute_uri }}" 
+           readonly 
+           onclick="this.select();" 
+           style="max-width: 500px; margin: 0.5rem auto; text-align: center;">
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/utils.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/rating.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,47 @@
+:root {
+    --meme-primary: #2563eb;
+    --meme-secondary: #14b8a6;
+}
+
+.meme-theme-tech {
+    font-family: "Courier New", "Courier", monospace;
+    background: #f1f5f9;
+}
+
+.meme-theme-tech .meme-maker-page {
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(15, 23, 42, 0.04) 0,
+        rgba(15, 23, 42, 0.04) 1px,
+        transparent 1px,
+        transparent 24px
+    );
+}
+
+.meme-theme-tech .meme-maker-header {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 2px solid #cbd5e1;
+    text-align: left;
+}
+
+.meme-theme-tech .meme-card {
+    border: 1px solid #cbd5e1;
+    box-shadow: none;
+}
+
+.meme-theme-tech .meme-btn {
+    background: transparent;
+    color: var(--meme-primary);
+    border: 1px solid var(--meme-primary);
+}
+
+.meme-theme-tech .meme-btn:hover {
+    background: var(--meme-primary);
+    color: #fff;
+}
+
+.meme-theme-tech .meme-sort-bar {
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+}

@@ -1,0 +1,49 @@
+:root {
+    --meme-primary: #0ea5e9;
+    --meme-secondary: #22c55e;
+}
+
+.meme-theme-modern {
+    font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.meme-theme-modern .meme-maker-container {
+    max-width: 1200px;
+}
+
+.meme-theme-modern .meme-maker-header {
+    text-align: left;
+    padding: 2rem;
+    border-radius: 16px;
+    background: radial-gradient(circle at top left, rgba(14, 165, 233, 0.15), transparent 60%),
+        radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 55%);
+}
+
+.meme-theme-modern .meme-maker-title {
+    font-size: 2.4rem;
+    letter-spacing: -0.02em;
+}
+
+.meme-theme-modern .meme-card {
+    border-radius: 20px;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.meme-theme-modern .meme-card-image {
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.meme-theme-modern .meme-btn {
+    border-radius: 999px;
+}
+
+.meme-theme-modern .meme-maker-nav a {
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+}
+
+.meme-theme-modern .meme-search-bar input[type="text"] {
+    border-radius: 999px;
+}

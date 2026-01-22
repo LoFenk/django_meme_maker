@@ -135,6 +135,9 @@ MEME_MAKER = {
     # Use the built-in base template (change to your own for embedding)
     'BASE_TEMPLATE': 'meme_maker/base.html',
     
+    # Template set to use [default, compact, modern, tech, classic]
+    'TEMPLATE_SET': 'classic',
+
     # Set to True when embedding in your site's layout
     'EMBED_MODE': False,
     

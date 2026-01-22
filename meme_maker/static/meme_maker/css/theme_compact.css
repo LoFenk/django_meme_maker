@@ -1,0 +1,56 @@
+:root {
+    --meme-primary: #0f766e;
+    --meme-secondary: #115e59;
+}
+
+.meme-theme-compact {
+    font-family: "Tahoma", "Verdana", sans-serif;
+    background: #f8fafc;
+}
+
+.meme-theme-compact .meme-maker-container {
+    max-width: 980px;
+}
+
+.meme-theme-compact .meme-maker-header {
+    text-align: left;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 1.25rem;
+}
+
+.meme-theme-compact .meme-maker-title {
+    font-size: 1.6rem;
+}
+
+.meme-theme-compact .meme-maker-subtitle {
+    font-size: 0.95rem;
+}
+
+.meme-theme-compact .meme-search-bar {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.meme-theme-compact .meme-sort-bar {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.meme-theme-compact .meme-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.meme-theme-compact .meme-card-image {
+    height: 160px;
+}
+
+.meme-theme-compact .meme-card-body {
+    padding: 0.75rem 1rem;
+}
+
+.meme-theme-compact .meme-btn {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.85rem;
+}

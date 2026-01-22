@@ -673,6 +673,16 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
                 # Fall back to default font
                 return ImageFont.load_default()
             
+            preview_width = None
+            if isinstance(self.text_overlays, dict):
+                meta = self.text_overlays.get('meta') or {}
+                preview_width = meta.get('preview_width')
+            try:
+                preview_width = float(preview_width)
+            except (TypeError, ValueError):
+                preview_width = None
+            base_width = preview_width if preview_width and preview_width > 0 else 800.0
+
             for overlay in overlays:
                 text = overlay.get('text', '')
                 if not text:
@@ -682,9 +692,9 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
                     text = text.upper()
                 
                 # Get user-specified font size, scale it relative to image width
-                # User's font size is based on ~800px preview, scale to actual image
+                # Use preview width metadata when available, fallback to 800px
                 user_font_size = overlay.get('font_size') or 48  # Handle None values
-                scale_factor = width / 800.0
+                scale_factor = width / base_width
                 font_size = max(16, int(user_font_size * scale_factor))
                 
                 # Load font at the correct size for this overlay

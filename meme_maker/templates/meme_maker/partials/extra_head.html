@@ -1,0 +1,16 @@
+{% load static %}
+{% if not meme_maker_uses_builtin_base %}
+<link rel="stylesheet" href="{% static 'meme_maker/css/meme_maker.css' %}">
+{% if meme_maker_theme_css %}
+<link rel="stylesheet" href="{% static meme_maker_theme_css %}">
+{% endif %}
+{% if meme_maker_primary_color or meme_maker_secondary_color or meme_maker_custom_css %}
+<style {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}>
+    :root {
+        {% if meme_maker_primary_color %}--meme-primary: {{ meme_maker_primary_color }};{% endif %}
+        {% if meme_maker_secondary_color %}--meme-secondary: {{ meme_maker_secondary_color }};{% endif %}
+    }
+    {{ meme_maker_custom_css|safe }}
+</style>
+{% endif %}
+{% endif %}

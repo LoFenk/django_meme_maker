@@ -13,6 +13,8 @@
         var previewTopText = document.getElementById('preview-top-text');
         var previewBottomText = document.getElementById('preview-bottom-text');
         var previewImage = document.getElementById('preview-image');
+        var overlaysField = document.getElementById('text-overlays-json');
+        var editorForm = document.getElementById('meme-editor-form');
 
         if (!topTextInput || !previewImage) return; // Not on editor page
 
@@ -66,6 +68,47 @@
             if (previewBottomText) previewBottomText.style.textTransform = textTransform;
         }
 
+        function buildOverlaysPayload() {
+            var overlays = [];
+            var textColor = textColorInput ? textColorInput.value : '#FFFFFF';
+            var strokeColor = strokeColorInput ? strokeColorInput.value : '#000000';
+            var fontSize = fontSizeInput ? (parseInt(fontSizeInput.value) || 48) : 48;
+            var uppercase = uppercaseInput ? uppercaseInput.checked : true;
+            var topText = topTextInput.value.trim();
+            var bottomText = bottomTextInput ? bottomTextInput.value.trim() : '';
+            var previewWidth = previewImage.offsetWidth || 800;
+            var previewHeight = previewImage.offsetHeight || 0;
+
+            if (topText) {
+                overlays.push({
+                    text: topText,
+                    position: 'top',
+                    color: textColor,
+                    stroke_color: strokeColor,
+                    font_size: fontSize,
+                    uppercase: uppercase
+                });
+            }
+            if (bottomText) {
+                overlays.push({
+                    text: bottomText,
+                    position: 'bottom',
+                    color: textColor,
+                    stroke_color: strokeColor,
+                    font_size: fontSize,
+                    uppercase: uppercase
+                });
+            }
+
+            return {
+                overlays: overlays,
+                meta: {
+                    preview_width: previewWidth,
+                    preview_height: previewHeight
+                }
+            };
+        }
+
         topTextInput.addEventListener('input', updatePreview);
         if (bottomTextInput) bottomTextInput.addEventListener('input', updatePreview);
         if (textColorInput) textColorInput.addEventListener('input', updatePreview);
@@ -78,6 +121,26 @@
 
         updatePreview();
         setTimeout(updatePreview, 100);
+
+        if (editorForm && overlaysField) {
+            editorForm.addEventListener('submit', function () {
+                try {
+                    if (overlaysField.value) {
+                        var parsed = JSON.parse(overlaysField.value);
+                        if (parsed && typeof parsed === 'object') {
+                            parsed.meta = parsed.meta || {};
+                            parsed.meta.preview_width = previewImage.offsetWidth || 800;
+                            parsed.meta.preview_height = previewImage.offsetHeight || 0;
+                            overlaysField.value = JSON.stringify(parsed);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    // Fall through to rebuild payload
+                }
+                overlaysField.value = JSON.stringify(buildOverlaysPayload());
+            });
+        }
     }
 
     if (document.readyState === 'loading') {
@@ -86,4 +149,3 @@
         initEditor();
     }
 })();
-

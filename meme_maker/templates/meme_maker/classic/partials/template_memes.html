@@ -1,0 +1,32 @@
+{% if recent_memes %}
+<h3 style="color: var(--meme-text-dark); margin-bottom: 1rem;">Memes using this template</h3>
+<div class="meme-grid">
+    {% for meme in recent_memes %}
+    <a href="{% url 'meme_maker:meme_detail' meme.pk %}" class="meme-card">
+        {% if meme.generated_image %}
+        <img src="{{ meme.generated_image.url }}" alt="Meme #{{ meme.id }}" class="meme-card-image">
+        {% else %}
+        <div class="meme-card-image" style="position: relative; height: 200px; overflow: hidden;">
+            <img src="{{ template.image.url }}" alt="Meme #{{ meme.id }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% for overlay in meme.get_overlay_for_css %}
+            <div class="meme-text-overlay" style="{{ overlay.style }}{% if overlay.color %}color: {{ overlay.color }};{% endif %}{% if overlay.font_size %}font-size: 1rem;{% endif %}">
+                {{ overlay.text }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="meme-card-body">
+            <h3 class="meme-card-title">Meme #{{ meme.id }}</h3>
+            <p class="meme-card-meta">{{ meme.created_at|date:"M d, Y" }}</p>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<h3 style="color: var(--meme-text-dark); margin-bottom: 1rem;">Memes using this template</h3>
+<div class="meme-empty">
+    <div class="meme-empty-icon">🎭</div>
+    <h2 class="meme-empty-title">No memes yet!</h2>
+    <p class="meme-empty-text">Be the first to create one from this template.</p>
+</div>
+{% endif %}

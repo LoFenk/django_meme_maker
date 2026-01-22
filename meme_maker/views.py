@@ -64,6 +64,18 @@ def get_redirect_back(request, fallback_url_name, **kwargs):
     return request.META.get('HTTP_REFERER') or reverse(fallback_url_name, kwargs=kwargs or None)
 
 
+def get_template_candidates(template_name):
+    """Return themed template candidates with fallback."""
+    template_set = meme_maker_settings.TEMPLATE_SET
+    if not template_set:
+        return [template_name]
+    base_name = template_name
+    if template_name.startswith('meme_maker/'):
+        base_name = template_name[len('meme_maker/'):]
+    themed = f"meme_maker/{template_set}/{base_name}"
+    return [themed, template_name]
+
+
 def get_template_memes_queryset(template, linked_obj=None):
     qs = template.memes.filter(flagged=False)
     if linked_obj:
@@ -167,7 +179,7 @@ def template_list(request):
     }
     context.update(get_meme_maker_context())
     
-    return render(request, 'meme_maker/template_list.html', context)
+    return render(request, get_template_candidates('meme_maker/template_list.html'), context)
 
 
 def template_detail(request, pk):
@@ -218,7 +230,7 @@ def template_detail(request, pk):
     }
     context.update(get_meme_maker_context())
     
-    return render(request, 'meme_maker/template_detail.html', context)
+    return render(request, get_template_candidates('meme_maker/template_detail.html'), context)
 
 
 def template_memes_partial(request, pk):
@@ -237,7 +249,7 @@ def template_memes_partial(request, pk):
         'recent_memes': memes_qs[:6],
         'memes_sort': sort_key,
     }
-    return render(request, 'meme_maker/partials/template_memes.html', context)
+    return render(request, get_template_candidates('meme_maker/partials/template_memes.html'), context)
 
 
 def template_upload(request):
@@ -267,7 +279,7 @@ def template_upload(request):
     }
     context.update(get_meme_maker_context())
     
-    return render(request, 'meme_maker/template_upload.html', context)
+    return render(request, get_template_candidates('meme_maker/template_upload.html'), context)
 
 
 def template_download(request, pk):
@@ -348,7 +360,7 @@ def meme_editor(request, template_pk):
     }
     context.update(get_meme_maker_context())
     
-    return render(request, 'meme_maker/meme_editor.html', context)
+    return render(request, get_template_candidates('meme_maker/meme_editor.html'), context)
 
 
 # =============================================================================
@@ -386,7 +398,7 @@ def meme_detail(request, pk):
     }
     context.update(get_meme_maker_context())
     
-    return render(request, 'meme_maker/meme_detail.html', context)
+    return render(request, get_template_candidates('meme_maker/meme_detail.html'), context)
 
 
 def meme_list(request):
@@ -451,7 +463,7 @@ def meme_list(request):
     }
     context.update(get_meme_maker_context())
     
-    return render(request, 'meme_maker/meme_list.html', context)
+    return render(request, get_template_candidates('meme_maker/meme_list.html'), context)
 
 
 def meme_download(request, pk):
@@ -698,6 +710,9 @@ class MemeTemplateListView(ListView):
         context.update(get_meme_maker_context())
         return context
 
+    def get_template_names(self):
+        return get_template_candidates(self.template_name)
+
 
 class MemeTemplateDetailView(DetailView):
     """Class-based view for template detail."""
@@ -723,6 +738,9 @@ class MemeTemplateDetailView(DetailView):
         context.update(get_meme_maker_context())
         return context
 
+    def get_template_names(self):
+        return get_template_candidates(self.template_name)
+
 
 class MemeTemplateCreateView(CreateView):
     """Class-based view for template upload."""
@@ -736,6 +754,9 @@ class MemeTemplateCreateView(CreateView):
         context['page_type'] = 'template_upload'
         context.update(get_meme_maker_context())
         return context
+
+    def get_template_names(self):
+        return get_template_candidates(self.template_name)
     
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -767,6 +788,9 @@ class MemeDetailView(DetailView):
         context.update(get_meme_maker_context())
         return context
 
+    def get_template_names(self):
+        return get_template_candidates(self.template_name)
+
 
 class MemeListView(ListView):
     """Class-based view for listing all memes."""
@@ -795,6 +819,9 @@ class MemeListView(ListView):
             context['total_count'] = context['paginator'].count
         context.update(get_meme_maker_context())
         return context
+
+    def get_template_names(self):
+        return get_template_candidates(self.template_name)
 
 
 # Need to import reverse for CBV success_url

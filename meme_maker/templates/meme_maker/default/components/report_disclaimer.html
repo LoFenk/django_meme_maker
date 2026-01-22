@@ -1,0 +1,11 @@
+<div class="meme-disclaimer{% if extra_class %} {{ extra_class }}{% endif %}">
+    <span class="meme-info-icon meme-tooltip" data-tooltip="User-generated content. If you believe this violates our policies, please report it.">ⓘ</span>
+    {% if request.user.is_authenticated %}
+    <form method="post" action="{{ flag_url }}" class="meme-flag-form">
+        {% csrf_token %}
+        <button type="submit" class="meme-flag-button meme-tooltip" data-tooltip="Report: If you believe this content violates our policies, click to report." aria-label="Report this content">⚑</button>
+    </form>
+    {% else %}
+    <span class="meme-flag-icon meme-tooltip" data-tooltip="Report: Please sign in to report content you believe violates our policies." aria-label="Report login required">⚑</span>
+    {% endif %}
+</div>

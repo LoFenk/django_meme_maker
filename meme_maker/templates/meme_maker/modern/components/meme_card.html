@@ -1,0 +1,42 @@
+{#
+Embeddable Meme Card Component
+==============================
+
+This component displays a meme as a card, suitable for grid layouts.
+
+Usage:
+    {% include "meme_maker/components/meme_card.html" with meme=meme %}
+
+Required context:
+    - meme: A Meme model instance
+
+Optional context:
+    - show_link: Whether to wrap in a link (default: True)
+    - show_text: Whether to show meme text (default: True)
+    - show_date: Whether to show creation date (default: True)
+#}
+
+<div class="meme-card-wrapper">
+    {% if show_link|default:True %}
+    <a href="{% url 'meme_maker:meme_detail' meme.pk %}" class="meme-card">
+    {% else %}
+    <div class="meme-card">
+    {% endif %}
+        <img src="{{ meme.get_display_image_url }}" alt="Meme #{{ meme.id }}" class="meme-card-image">
+        <div class="meme-card-body">
+            <h3 class="meme-card-title">Meme #{{ meme.id }}</h3>
+            {% if show_text|default:True %}
+                {% for overlay in meme.get_overlays|slice:":2" %}
+                <p class="meme-card-text">{{ overlay.text|truncatewords:8 }}</p>
+                {% endfor %}
+            {% endif %}
+            {% if show_date|default:True %}
+            <p class="meme-card-meta">{{ meme.created_at|date:"M d, Y" }}</p>
+            {% endif %}
+        </div>
+    {% if show_link|default:True %}
+    </a>
+    {% else %}
+    </div>
+    {% endif %}
+</div>

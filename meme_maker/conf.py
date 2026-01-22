@@ -47,6 +47,10 @@ MEME_MAKER = {
     # Accepts a dotted path or callable that receives request
     # and returns a model instance or None
     'LINKED_OBJECT_RESOLVER': None,
+
+    # Optional template set name for themed frontends
+    # If set, templates are loaded from meme_maker/<TEMPLATE_SET>/... with fallback
+    'TEMPLATE_SET': None,
 }
 """
 
@@ -79,6 +83,7 @@ class MemeMakerSettings:
         'WATERMARK_SCALE': 0.15,  # Relative to meme width
         'WATERMARK_PADDING': 10,  # Pixels from edge
         'LINKED_OBJECT_RESOLVER': None,  # Callable or dotted path
+        'TEMPLATE_SET': None,  # Template theme folder name
     }
     
     def __init__(self):
@@ -101,6 +106,22 @@ class MemeMakerSettings:
         context = {}
         for key in self.DEFAULTS:
             context[f'meme_maker_{key.lower()}'] = getattr(self, key)
+        template_set = getattr(self, 'TEMPLATE_SET', None)
+        base_template = getattr(self, 'BASE_TEMPLATE', None)
+        default_base = self.DEFAULTS.get('BASE_TEMPLATE', 'meme_maker/base.html')
+        if template_set and (not base_template or base_template == default_base):
+            base_template = f"meme_maker/{template_set}/base.html"
+        context['meme_maker_base_template'] = base_template
+        context['meme_maker_template_base'] = (
+            f"meme_maker/{template_set}" if template_set else "meme_maker"
+        )
+        context['meme_maker_uses_builtin_base'] = (
+            bool(base_template) and base_template.startswith("meme_maker/")
+        )
+        if template_set in ('compact', 'modern', 'tech', 'classic'):
+            context['meme_maker_theme_css'] = f"meme_maker/css/theme_{template_set}.css"
+        else:
+            context['meme_maker_theme_css'] = None
         return context
 
 

@@ -1,0 +1,51 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title|default:meme_maker_title|default:"Meme Maker" }}{% endblock %}</title>
+    
+    {% block meme_maker_styles %}
+    <link rel="stylesheet" href="{% static 'meme_maker/css/meme_maker.css' %}">
+    {% if meme_maker_primary_color or meme_maker_secondary_color or meme_maker_custom_css %}
+    <style {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}>
+        :root {
+            {% if meme_maker_primary_color %}--meme-primary: {{ meme_maker_primary_color }};{% endif %}
+            {% if meme_maker_secondary_color %}--meme-secondary: {{ meme_maker_secondary_color }};{% endif %}
+        }
+        {{ meme_maker_custom_css|safe }}
+    </style>
+    {% endif %}
+    {% endblock %}
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if not meme_maker_embed_mode %}
+    <div class="meme-maker-page">
+    {% endif %}
+    
+        <div class="meme-maker-container">
+            {% block meme_maker_header %}
+            <header class="meme-maker-header">
+                <h1 class="meme-maker-title">{% block header_title %}{{ meme_maker_title|default:"Meme Maker" }}{% endblock %}</h1>
+                <p class="meme-maker-subtitle">{% block header_subtitle %}Create and share your memes{% endblock %}</p>
+            </header>
+            {% endblock %}
+            
+            <main class="meme-maker-content">
+                {# Nav and messages are now included via partials/nav.html in each child template #}
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    
+    {% if not meme_maker_embed_mode %}
+    </div>
+    {% endif %}
+    
+    <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="{% static 'meme_maker/js/utils.js' %}"></script>
+    <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %}src="{% static 'meme_maker/js/rating.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

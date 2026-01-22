@@ -1,0 +1,18 @@
+{# Navigation partial for meme_maker - included in child templates for custom base template support #}
+{% load static %}
+
+{% if meme_maker_show_nav %}
+<nav class="meme-maker-nav">
+    <a href="{% url 'meme_maker:template_list' %}" {% if page_type == 'template_list' %}class="active"{% endif %}>🔍 Browse Templates</a>
+    <a href="{% url 'meme_maker:template_upload' %}" {% if page_type == 'template_upload' %}class="active"{% endif %}>📤 Upload Template</a>
+    <a href="{% url 'meme_maker:meme_list' %}" {% if page_type == 'meme_list' %}class="active"{% endif %}>🎭 All Memes</a>
+</nav>
+{% endif %}
+
+{% if messages %}
+<div class="meme-alerts">
+    {% for message in messages %}
+    <div class="meme-alert meme-alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}

@@ -1,4 +1,4 @@
-/* Meme Maker CSS - v1.2.4 */
+/* Meme Maker CSS - v1.3.1 */
 
 /* CSS Variables (defaults - can be overridden via inline style on :root) */
 :root {
@@ -116,6 +116,7 @@
 .meme-card {
     background: var(--meme-bg-light); border-radius: var(--meme-radius-sm); overflow: hidden;
     box-shadow: var(--meme-shadow-sm); text-decoration: none; color: inherit; display: block;
+    padding-top: 0.5rem;
     transition: transform .2s, box-shadow .2s;
 }
 .meme-card:hover { transform: translateY(-4px); box-shadow: var(--meme-shadow); }

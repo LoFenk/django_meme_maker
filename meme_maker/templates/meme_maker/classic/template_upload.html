@@ -1,0 +1,79 @@
+{% extends meme_maker_base_template|default:"meme_maker/classic/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{% include "meme_maker/partials/extra_head.html" %}
+{% endblock %}
+
+{% block header_title %}Upload Template{% endblock %}
+{% block header_subtitle %}Add a new meme template to the bank{% endblock %}
+
+{% block content %}
+{% include meme_maker_template_base|add:"/partials/nav.html" %}
+
+<form method="post" enctype="multipart/form-data" class="meme-form" style="max-width: 600px; margin: 0 auto;">
+    {% csrf_token %}
+    
+    <div class="meme-form-group">
+        <label for="{{ form.image.id_for_label }}" class="meme-form-label">
+            {{ form.image.label }} *
+        </label>
+        {{ form.image }}
+        {% if form.image.help_text %}
+        <p class="meme-form-help">{{ form.image.help_text }}</p>
+        {% endif %}
+        {% if form.image.errors %}
+        <p class="meme-form-error">{{ form.image.errors.0 }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="meme-form-group">
+        <label for="{{ form.title.id_for_label }}" class="meme-form-label">
+            {{ form.title.label }} *
+        </label>
+        {{ form.title }}
+        {% if form.title.help_text %}
+        <p class="meme-form-help">{{ form.title.help_text }}</p>
+        {% endif %}
+        {% if form.title.errors %}
+        <p class="meme-form-error">{{ form.title.errors.0 }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="meme-form-group">
+        <label for="{{ form.tags.id_for_label }}" class="meme-form-label">
+            {{ form.tags.label }}
+        </label>
+        {{ form.tags }}
+        {% if form.tags.help_text %}
+        <p class="meme-form-help">{{ form.tags.help_text }}</p>
+        {% endif %}
+        {% if form.tags.errors %}
+        <p class="meme-form-error">{{ form.tags.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+    <div class="meme-form-group">
+        <div class="meme-checkbox-group">
+            {{ form.nsfw }}
+            <label for="{{ form.nsfw.id_for_label }}" class="meme-form-label" style="margin: 0;">
+                {{ form.nsfw.label }}
+            </label>
+        </div>
+        {% if form.nsfw.help_text %}
+        <p class="meme-form-help">{{ form.nsfw.help_text }}</p>
+        {% endif %}
+        {% if form.nsfw.errors %}
+        <p class="meme-form-error">{{ form.nsfw.errors.0 }}</p>
+        {% endif %}
+    </div>
+    
+    <button type="submit" class="meme-btn meme-btn-full">
+        Upload & Create Meme →
+    </button>
+    
+    <p class="meme-form-help" style="text-align: center; margin-top: 1rem;">
+        After uploading, you'll be taken to the editor to create your first meme from this template.
+    </p>
+</form>
+{% endblock %}

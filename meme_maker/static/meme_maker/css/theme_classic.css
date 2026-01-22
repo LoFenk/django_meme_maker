@@ -1,0 +1,38 @@
+:root {
+    --meme-primary: #7c2d12;
+    --meme-secondary: #b45309;
+}
+
+.meme-theme-classic {
+    font-family: "Georgia", "Times New Roman", serif;
+    background: #fdf6e3;
+}
+
+.meme-theme-classic .meme-maker-container {
+    background: #fffaf0;
+    border: 1px solid #e7d9c4;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.meme-theme-classic .meme-maker-header {
+    text-align: center;
+    border-bottom: 1px solid #e7d9c4;
+}
+
+.meme-theme-classic .meme-card {
+    border: 1px solid #e7d9c4;
+    box-shadow: 0 4px 10px rgba(120, 70, 20, 0.08);
+}
+
+.meme-theme-classic .meme-btn {
+    border-radius: 4px;
+    background: var(--meme-primary);
+    color: #fff;
+}
+
+.meme-theme-classic .meme-btn.meme-btn-secondary {
+    background: #fff;
+    color: var(--meme-primary);
+    border: 1px solid var(--meme-primary);
+}
