@@ -57,9 +57,18 @@
             var previewWidth = previewImage.offsetWidth || 500;
             var scaleFactor = previewWidth / 800;
             var scaledFontSize = Math.max(12, Math.round(fontSize * scaleFactor));
+            
+            // Set max-width to exactly 90% of image width (matching Pillow's wrap behavior)
+            var maxTextWidth = Math.round(previewWidth * 0.9) + 'px';
 
-            if (previewTopText) previewTopText.style.fontSize = scaledFontSize + 'px';
-            if (previewBottomText) previewBottomText.style.fontSize = scaledFontSize + 'px';
+            if (previewTopText) {
+                previewTopText.style.fontSize = scaledFontSize + 'px';
+                previewTopText.style.maxWidth = maxTextWidth;
+            }
+            if (previewBottomText) {
+                previewBottomText.style.fontSize = scaledFontSize + 'px';
+                previewBottomText.style.maxWidth = maxTextWidth;
+            }
 
             if (fontSizeDisplay) fontSizeDisplay.textContent = fontSize;
 

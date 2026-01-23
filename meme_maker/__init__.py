@@ -24,7 +24,7 @@ Usage after Django is loaded:
     from meme_maker import Meme, MemeTemplate, MemeTemplateForm, meme_maker_settings
 """
 
-__version__ = '1.3.4'
+__version__ = '1.3.5'
 __author__ = 'Paul Stoica'
 
 

@@ -5,6 +5,14 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-01-22
+
+### Fixed
+- **Text wrapping width mismatch**: Preview now wraps text at exactly 90% of image width
+  - JavaScript now dynamically sets `max-width` to 90% of actual preview image width
+  - Matches Pillow's text wrapping behavior exactly
+  - Previously CSS `max-width: 90%` was relative to container, not the image
+
 ## [1.3.4] - 2026-01-22
 
 ### Fixed
