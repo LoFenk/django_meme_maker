@@ -725,6 +725,39 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
                 preview_width = None
             base_width = preview_width if preview_width and preview_width > 0 else 800.0
 
+            # Text wrapping helper to match CSS behavior (max-width: 90%)
+            def wrap_text(text, font, max_width):
+                """
+                Wrap text to fit within max_width, matching CSS word-wrap behavior.
+                Returns a list of lines.
+                """
+                words = text.split()
+                if not words:
+                    return [text]
+                
+                lines = []
+                current_line = []
+                
+                for word in words:
+                    # Test if adding this word exceeds max width
+                    test_line = ' '.join(current_line + [word])
+                    bbox = draw.textbbox((0, 0), test_line, font=font)
+                    test_width = bbox[2] - bbox[0]
+                    
+                    if test_width <= max_width:
+                        current_line.append(word)
+                    else:
+                        # Line is full, start a new one
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                        current_line = [word]
+                
+                # Don't forget the last line
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                return lines if lines else [text]
+            
             for overlay in overlays:
                 text = overlay.get('text', '')
                 if not text:
@@ -742,38 +775,55 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
                 # Load font at the correct size for this overlay
                 font = load_font(font_size)
                 
+                # Calculate max text width (90% of image, matching CSS max-width: 90%)
+                max_text_width = int(width * 0.9)
+                
+                # Wrap text to multiple lines if needed
+                lines = wrap_text(text, font, max_text_width)
+                
+                # Calculate line height (1.2x font size, matching CSS line-height: 1.2)
+                line_height = int(font_size * 1.2)
+                
+                # Calculate total text block height
+                total_text_height = line_height * len(lines)
+                
                 # Calculate position
                 position = overlay.get('position', 'top')
                 
-                # Get text bounding box
-                bbox = draw.textbbox((0, 0), text, font=font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                
-                x = (width - text_width) // 2
-                
                 if position == 'top':
-                    y = int(height * 0.03)
+                    start_y = int(height * 0.03)
                 elif position == 'bottom':
-                    y = height - text_height - int(height * 0.03)
+                    start_y = height - total_text_height - int(height * 0.03)
                 else:
-                    x = int(width * overlay.get('x', 50) / 100) - text_width // 2
-                    y = int(height * overlay.get('y', 50) / 100) - text_height // 2
+                    start_y = int(height * overlay.get('y', 50) / 100) - total_text_height // 2
                 
                 # Draw text with stroke
-                stroke_color = overlay.get('stroke_color') or '#000000'  # Handle empty/None
-                text_color = overlay.get('color') or '#FFFFFF'  # Handle empty/None
-                # Scale stroke width with font size
+                stroke_color = overlay.get('stroke_color') or '#000000'
+                text_color = overlay.get('color') or '#FFFFFF'
                 stroke_width = max(2, int(font_size / 16))
                 
-                # Draw stroke (outline) - use a more efficient method
-                for dx in range(-stroke_width, stroke_width + 1):
-                    for dy in range(-stroke_width, stroke_width + 1):
-                        if dx * dx + dy * dy <= stroke_width * stroke_width:
-                            draw.text((x + dx, y + dy), text, font=font, fill=stroke_color)
-                
-                # Draw main text
-                draw.text((x, y), text, font=font, fill=text_color)
+                # Draw each line
+                for i, line in enumerate(lines):
+                    # Get line width for centering
+                    bbox = draw.textbbox((0, 0), line, font=font)
+                    line_width = bbox[2] - bbox[0]
+                    
+                    # Center horizontally (or use custom x position)
+                    if position in ('top', 'bottom'):
+                        x = (width - line_width) // 2
+                    else:
+                        x = int(width * overlay.get('x', 50) / 100) - line_width // 2
+                    
+                    y = start_y + (i * line_height)
+                    
+                    # Draw stroke (outline)
+                    for dx in range(-stroke_width, stroke_width + 1):
+                        for dy in range(-stroke_width, stroke_width + 1):
+                            if dx * dx + dy * dy <= stroke_width * stroke_width:
+                                draw.text((x + dx, y + dy), line, font=font, fill=stroke_color)
+                    
+                    # Draw main text
+                    draw.text((x, y), line, font=font, fill=text_color)
             
             # Apply watermark if configured
             img = self._apply_watermark(img)

@@ -5,6 +5,13 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-01-22
+
+### Fixed
+- **Text wrapping mismatch**: Long text that wraps in the editor preview now wraps the same way in generated images
+  - Implemented word-wrap in Pillow to match CSS `max-width: 90%; word-wrap: break-word;` behavior
+  - Text lines are properly centered and spaced with `line-height: 1.2` matching CSS
+
 ## [1.3.2] - 2026-01-22
 
 ### Added
