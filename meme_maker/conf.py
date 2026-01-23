@@ -51,6 +51,11 @@ MEME_MAKER = {
     # Optional template set name for themed frontends
     # If set, templates are loaded from meme_maker/<TEMPLATE_SET>/... with fallback
     'TEMPLATE_SET': None,
+    
+    # Custom font path for meme text rendering
+    # If not set, uses system Impact font or bundled Anton font
+    # Example: '/path/to/custom-font.ttf'
+    'FONT_PATH': None,
 }
 """
 
@@ -84,6 +89,7 @@ class MemeMakerSettings:
         'WATERMARK_PADDING': 10,  # Pixels from edge
         'LINKED_OBJECT_RESOLVER': None,  # Callable or dotted path
         'TEMPLATE_SET': None,  # Template theme folder name
+        'FONT_PATH': None,  # Custom font path for meme text
     }
     
     def __init__(self):

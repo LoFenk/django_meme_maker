@@ -167,9 +167,12 @@ class MemeEditorForm(forms.Form):
         label='NSFW',
     )
     
-    def get_overlays(self):
+    def get_overlays_with_meta(self):
         """
-        Convert form data to text overlays list.
+        Convert form data to text overlays list and meta information.
+        
+        Returns:
+            tuple: (overlays_list, meta_dict) where meta contains preview dimensions
         
         If JSON is provided (advanced mode), use that.
         Otherwise, build from simple top/bottom fields.
@@ -180,13 +183,14 @@ class MemeEditorForm(forms.Form):
             try:
                 data = json.loads(json_data)
                 if isinstance(data, list):
-                    return data
+                    return data, {}
                 elif isinstance(data, dict) and 'overlays' in data:
-                    return data['overlays']
+                    meta = data.get('meta', {})
+                    return data['overlays'], meta
             except json.JSONDecodeError:
                 pass
         
-        # Build from simple fields
+        # Build from simple fields (no meta available from JS)
         overlays = []
         
         text_color = self.cleaned_data.get('text_color', '#FFFFFF')
@@ -216,5 +220,14 @@ class MemeEditorForm(forms.Form):
                 'uppercase': uppercase,
             })
         
+        return overlays, {}
+    
+    def get_overlays(self):
+        """
+        Convert form data to text overlays list.
+        
+        Deprecated: Use get_overlays_with_meta() to also get preview metadata.
+        """
+        overlays, _ = self.get_overlays_with_meta()
         return overlays
 

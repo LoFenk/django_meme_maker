@@ -338,9 +338,9 @@ def meme_editor(request, template_pk):
             # Create new meme from template
             meme = Meme(template=template)
             
-            # Get overlays from form
-            overlays = form.get_overlays()
-            meme.set_overlays(overlays)
+            # Get overlays and meta (preview dimensions) from form
+            overlays, meta = form.get_overlays_with_meta()
+            meme.set_overlays(overlays, meta)
             
             meme.nsfw = form.cleaned_data.get('nsfw', False)
             meme.save()

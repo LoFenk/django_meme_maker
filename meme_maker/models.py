@@ -584,9 +584,17 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
             return self.text_overlays.get('overlays', [])
         return []
     
-    def set_overlays(self, overlays_list):
-        """Set text overlays from a list."""
+    def set_overlays(self, overlays_list, meta=None):
+        """
+        Set text overlays from a list with optional meta information.
+        
+        Args:
+            overlays_list: List of overlay dictionaries
+            meta: Optional dict with metadata like preview_width, preview_height
+        """
         self.text_overlays = {'overlays': overlays_list}
+        if meta:
+            self.text_overlays['meta'] = meta
     
     def get_overlay_for_css(self):
         """
@@ -657,20 +665,54 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
             
             # Font loading helper
             def load_font(size):
-                """Try to load Impact font at given size, fall back to default."""
-                font_paths = [
+                """
+                Try to load a meme-appropriate font at given size.
+                
+                Priority:
+                1. Custom font from MEME_MAKER['FONT_PATH'] setting
+                2. Impact font from system paths
+                3. Bundled Anton font (Impact-like, open source)
+                4. Pillow default font (last resort, very small)
+                """
+                import os
+                
+                # Start with custom font if configured
+                font_paths = []
+                custom_font = meme_maker_settings.FONT_PATH
+                if custom_font:
+                    font_paths.append(custom_font)
+                
+                # System Impact font locations
+                font_paths.extend([
                     "Impact",
                     "/System/Library/Fonts/Supplemental/Impact.ttf",  # macOS
-                    "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",  # Linux
+                    "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",  # Linux (msttcorefonts)
                     "/usr/share/fonts/TTF/impact.ttf",  # Arch Linux
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux fallback
                     "C:\\Windows\\Fonts\\impact.ttf",  # Windows
-                ]
+                ])
+                
+                # Add bundled Anton font as fallback
+                # Anton is an open-source Impact-like font bundled with the package
+                bundled_font = os.path.join(
+                    os.path.dirname(__file__),
+                    'static', 'meme_maker', 'fonts', 'Anton-Regular.ttf'
+                )
+                font_paths.append(bundled_font)
+                
                 for font_path in font_paths:
                     try:
                         return ImageFont.truetype(font_path, size)
                     except (IOError, OSError):
                         continue
-                # Fall back to default font
+                
+                # Last resort: Pillow default (very small bitmap font)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "No suitable meme font found. Text may appear very small. "
+                    "Install Impact font or set MEME_MAKER['FONT_PATH'] to a .ttf file."
+                )
                 return ImageFont.load_default()
             
             preview_width = None

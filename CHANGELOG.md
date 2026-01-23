@@ -5,6 +5,22 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-01-22
+
+### Added
+- **Bundled fallback font**: Anton font (open-source Impact alternative) bundled for servers without Impact installed
+- **Custom font setting**: New `MEME_MAKER['FONT_PATH']` setting to specify a custom .ttf font for meme text rendering
+
+### Fixed
+- **Text size mismatch**: Fixed preview text appearing different size than generated meme image
+  - Preview metadata (`preview_width`) is now properly preserved through form submission
+  - Pillow image generation now uses actual preview dimensions for accurate font scaling
+- **Font availability**: Image generation no longer falls back to tiny default font when Impact is unavailable
+
+### Changed
+- **Font loading priority**: Custom font → System Impact → Bundled Anton → Pillow default
+- Form method `get_overlays()` now has companion `get_overlays_with_meta()` for accessing preview dimensions
+
 ## [1.3.1] - 2026-01-22
 
 ### Added

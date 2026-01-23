@@ -157,6 +157,10 @@ MEME_MAKER = {
     # Optional themed template set name
     # Looks for templates in meme_maker/<TEMPLATE_SET>/... with fallback to defaults
     'TEMPLATE_SET': None,
+    
+    # Custom font path for meme text rendering (optional)
+    # If not set, uses system Impact font or bundled Anton font
+    'FONT_PATH': None,  # e.g., '/path/to/custom-font.ttf'
 }
 ```
 
@@ -209,6 +213,43 @@ MEME_MAKER = {
 The watermark will be automatically scaled to maintain aspect ratio and placed in the bottom-right corner of all generated meme images.
 
 **Tip:** Use a transparent PNG for best results.
+
+### Font Configuration
+
+By default, the meme maker uses the following font priority for text rendering:
+
+1. **Custom font** from `MEME_MAKER['FONT_PATH']` setting (if configured)
+2. **System Impact font** (various OS locations)
+3. **Bundled Anton font** (open-source Impact alternative included with the package)
+4. **Pillow default** (last resort, very small bitmap font)
+
+The bundled Anton font ensures your memes render with proper meme-style text even on servers without Impact installed.
+
+#### Using a Custom Font
+
+```python
+# settings.py
+MEME_MAKER = {
+    # Absolute path to a .ttf font file
+    'FONT_PATH': '/path/to/your/custom-font.ttf',
+}
+```
+
+#### Installing Impact on Linux Servers
+
+If you prefer the original Impact font:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install ttf-mscorefonts-installer
+
+# Fedora/RHEL
+sudo dnf install curl cabextract xorg-x11-font-utils fontconfig
+sudo rpm -i https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
+
+# Arch Linux
+yay -S ttf-ms-fonts
+```
 
 ### Linked Object Resolver (Scoped Templates/Memes)
 
