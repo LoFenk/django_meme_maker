@@ -1,4 +1,13 @@
-/* Meme Maker CSS - v1.3.1 */
+/* Meme Maker CSS - v1.3.5 */
+
+/* Load bundled Anton font to match Pillow rendering */
+@font-face {
+    font-family: 'MemeFont';
+    src: url('../fonts/Anton-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* CSS Variables (defaults - can be overridden via inline style on :root) */
 :root {
@@ -132,6 +141,7 @@
 .meme-image { max-width: 100%; height: auto; border-radius: var(--meme-radius-sm); box-shadow: var(--meme-shadow-sm); }
 .meme-text-overlay {
     position: absolute; left: 50%; transform: translateX(-50%); color: #fff; font-weight: 900;
+    font-family: 'MemeFont', Impact, 'Arial Black', sans-serif;
     font-size: clamp(1.25rem, 4vw, 2.5rem); text-transform: uppercase; letter-spacing: .05em;
     max-width: 90%; word-wrap: break-word; text-align: center; line-height: 1.2; pointer-events: none;
     text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 3px 6px rgba(0,0,0,.5);

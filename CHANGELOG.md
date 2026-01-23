@@ -5,6 +5,15 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2026-01-22
+
+### Fixed
+- **Font mismatch between preview and generated image**: Preview now uses same font as Pillow
+  - Added `@font-face` to load bundled Anton font in CSS preview
+  - Text overlay now uses `font-family: 'MemeFont', Impact, 'Arial Black', sans-serif`
+  - Previously preview used browser's default sans-serif (wider) while Pillow used Anton (condensed)
+  - This was causing text to wrap at different points in preview vs generated image
+
 ## [1.3.5] - 2026-01-22
 
 ### Fixed
