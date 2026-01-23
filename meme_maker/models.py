@@ -715,15 +715,12 @@ class Meme(LinkableMixin, RatingMixin, models.Model):
                 )
                 return ImageFont.load_default()
             
-            preview_width = None
-            if isinstance(self.text_overlays, dict):
-                meta = self.text_overlays.get('meta') or {}
-                preview_width = meta.get('preview_width')
-            try:
-                preview_width = float(preview_width)
-            except (TypeError, ValueError):
-                preview_width = None
-            base_width = preview_width if preview_width and preview_width > 0 else 800.0
+            # Font size reference: 800px is the canonical width for font sizing
+            # Both CSS preview and Pillow use 800px as the base, ensuring:
+            #   - CSS: font_size * (preview_width / 800) = X% of preview
+            #   - Pillow: font_size * (image_width / 800) = X% of image
+            # This guarantees the text appears at the same relative size
+            base_width = 800.0
 
             # Text wrapping helper to match CSS behavior (max-width: 90%)
             def wrap_text(text, font, max_width):
