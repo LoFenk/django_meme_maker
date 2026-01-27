@@ -1102,6 +1102,70 @@ class MemeFlag(models.Model):
 
 
 # =============================================================================
+# EXTERNAL SEARCH CACHE
+# =============================================================================
+
+class ExternalSourceQuery(models.Model):
+    """Cache for external search queries (e.g., Imgflip)."""
+    SITE_IMGFLIP = 'imgflip'
+    SITE_CHOICES = [
+        (SITE_IMGFLIP, 'Imgflip'),
+    ]
+
+    STATUS_SUCCESS = 'success'
+    STATUS_ERROR = 'error'
+    STATUS_CHOICES = [
+        (STATUS_SUCCESS, 'Success'),
+        (STATUS_ERROR, 'Error'),
+    ]
+
+    site_name = models.CharField(
+        max_length=50,
+        choices=SITE_CHOICES,
+    )
+    query_str = models.CharField(
+        max_length=300,
+        help_text="Original query string",
+    )
+    normalized_query = models.CharField(
+        max_length=300,
+        db_index=True,
+        help_text="Normalized query for cache lookups",
+    )
+    fetched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this query was last fetched from the external source",
+    )
+    result_json = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Raw API response payload",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ERROR,
+    )
+    error_message = models.TextField(
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['site_name', 'normalized_query'], name='unique_external_query'),
+        ]
+        indexes = [
+            models.Index(fields=['fetched_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.site_name}:{self.normalized_query}"
+
+
+# =============================================================================
 # OBJECT LINKING MODELS (Generic Many-to-Many)
 # =============================================================================
 

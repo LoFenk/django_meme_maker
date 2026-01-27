@@ -3,6 +3,7 @@
 
 {% block extra_head %}
 {% include "meme_maker/partials/extra_head.html" %}
+<link rel="stylesheet" href="{% static 'meme_maker/css/imgflip_search.css' %}">
 {% endblock %}
 
 {% block header_title %}Template Bank{% endblock %}
@@ -18,7 +19,8 @@
            value="{{ query }}" 
            class="meme-form-control" 
            placeholder="Search templates by name or tags..."
-           autocomplete="off">
+           autocomplete="off"
+           data-imgflip-query>
     <input type="hidden" name="order" value="{{ order_by }}">
     <input type="hidden" name="per_page" value="{{ per_page }}">
     <button type="submit" class="meme-btn">Search</button>
@@ -53,6 +55,22 @@
     {% endif %}
 </div>
 
+{% if imgflip_show_tab %}
+<div class="meme-tabs" data-imgflip-tabs>
+    <button type="button" class="meme-tab is-active" data-tab-target="local">Local</button>
+    <button type="button"
+            class="meme-tab{% if not imgflip_enabled %} is-disabled{% endif %}"
+            data-tab-target="imgflip"
+            data-imgflip-tab
+            data-imgflip-url="{% url 'meme_maker:imgflip_search' %}"
+            {% if not imgflip_enabled %}data-imgflip-disabled="1"{% endif %}>
+        Imgflip
+    </button>
+</div>
+{% endif %}
+
+<div class="meme-tab-panels" data-imgflip-panels>
+    <div class="meme-tab-panel is-active" data-tab-panel="local">
 {% if templates %}
 <div class="meme-grid">
     {% for template in templates %}
@@ -123,9 +141,30 @@
     </a>
 </div>
 {% endif %}
+    </div>
+    {% if imgflip_show_tab %}
+    <div class="meme-tab-panel" data-tab-panel="imgflip">
+        <div class="imgflip-loading" data-imgflip-loading hidden>
+            <span class="imgflip-spinner" aria-hidden="true"></span>
+            <span>Loading Imgflip results…</span>
+        </div>
+        <div class="imgflip-results" data-imgflip-results>
+            {% if imgflip_enabled %}
+            <p class="imgflip-empty">Click to load Imgflip results.</p>
+            {% else %}
+            <p class="imgflip-empty">Imgflip search unavailable.</p>
+            {% if imgflip_disabled_reason and request.user.is_staff %}
+            <p class="imgflip-hint">{{ imgflip_disabled_reason }}</p>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
 {% endblock content %}
 
 {% block extra_js %}
 <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/utils.js' %}"></script>
 <script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/rating.js' %}"></script>
+<script {% if CSP_NONCE %}nonce="{{ CSP_NONCE }}"{% endif %} src="{% static 'meme_maker/js/imgflip_search.js' %}"></script>
 {% endblock %}

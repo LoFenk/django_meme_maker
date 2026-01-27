@@ -158,6 +158,14 @@ MEME_MAKER = {
     # Looks for templates in meme_maker/<TEMPLATE_SET>/... with fallback to defaults
     'TEMPLATE_SET': None,
     
+    # Imgflip search integration (optional)
+    'ENABLE_IMGFLIP_SEARCH': False,
+    'IMGFLIP_USERNAME': None,
+    'IMGFLIP_PASSWORD': None,
+    'IMGFLIP_DEFAULT_TYPE': 'image',
+    'IMGFLIP_INCLUDE_NSFW': False,
+    'IMGFLIP_CACHE_DAYS': 30,
+
     # Custom font path for meme text rendering (optional)
     # If not set, uses system Impact font or bundled Anton font
     'FONT_PATH': None,  # e.g., '/path/to/custom-font.ttf'
@@ -189,6 +197,29 @@ Included sets:
 - `modern`: rounded cards and soft gradients
 - `tech`: monospace, grid background, crisp borders
 - `classic`: serif typography with warm tones
+
+### Imgflip Search (Optional)
+
+Imgflip search is an optional integration intended for Imgflip Premium (paid) accounts.
+It uses Imgflip's `search_memes` endpoint and requires a username and password.
+By default, results are cached for 30 days per query to reduce external calls.
+
+```python
+MEME_MAKER = {
+    'ENABLE_IMGFLIP_SEARCH': True,
+    'IMGFLIP_USERNAME': 'your_imgflip_username',
+    'IMGFLIP_PASSWORD': 'your_imgflip_password',
+    'IMGFLIP_DEFAULT_TYPE': 'image',   # default
+    'IMGFLIP_INCLUDE_NSFW': False,     # default
+    'IMGFLIP_CACHE_DAYS': 30,          # default
+}
+```
+
+Notes:
+- If disabled or misconfigured, the Imgflip tab is hidden (or shown only to admins).
+- Set `IMGFLIP_INCLUDE_NSFW=True` to include NSFW results.
+- Set `IMGFLIP_CACHE_DAYS` lower to refresh results more often.
+- Imgflip results are fetched only when the Imgflip tab is clicked.
 
 ### Watermark Configuration
 

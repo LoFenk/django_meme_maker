@@ -10,19 +10,22 @@ Provides views for:
 
 import json
 import mimetypes
+import re
+from datetime import timedelta
+import requests
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.generic import CreateView, DetailView, ListView
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 from django.core.files.storage import default_storage
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-from .models import Meme, MemeTemplate, TemplateRating, MemeRating, MemeFlag, TemplateFlag
+from .models import Meme, MemeTemplate, TemplateRating, MemeRating, MemeFlag, TemplateFlag, ExternalSourceQuery
 from .forms import MemeTemplateForm, MemeTemplateSearchForm, MemeEditorForm
 from .conf import meme_maker_settings
 
@@ -74,6 +77,41 @@ def get_template_candidates(template_name):
         base_name = template_name[len('meme_maker/'):]
     themed = f"meme_maker/{template_set}/{base_name}"
     return [themed, template_name]
+
+
+def normalize_external_query(query):
+    """Normalize external search query for caching."""
+    normalized = re.sub(r'\s+', ' ', (query or '')).strip().lower()
+    return normalized
+
+
+def get_imgflip_state(request):
+    """Return (enabled, show_tab, disabled_reason)."""
+    enabled_setting = bool(meme_maker_settings.ENABLE_IMGFLIP_SEARCH)
+    has_creds = bool(meme_maker_settings.IMGFLIP_USERNAME and meme_maker_settings.IMGFLIP_PASSWORD)
+    enabled = enabled_setting and has_creds
+    show_tab = enabled
+    if request.user.is_authenticated and request.user.is_staff:
+        show_tab = True
+    disabled_reason = None
+    if show_tab and not enabled:
+        if not enabled_setting:
+            disabled_reason = 'Imgflip search is disabled in settings.'
+        elif not has_creds:
+            disabled_reason = 'Imgflip credentials are not configured.'
+    return enabled, show_tab, disabled_reason
+
+
+def extract_imgflip_memes(result_json):
+    if not isinstance(result_json, dict):
+        return []
+    if not result_json.get('success'):
+        return []
+    data = result_json.get('data') or {}
+    memes = data.get('memes') or []
+    if isinstance(memes, list):
+        return memes
+    return []
 
 
 def get_template_memes_queryset(template, linked_obj=None):
@@ -165,6 +203,8 @@ def template_list(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
     
+    imgflip_enabled, imgflip_show_tab, imgflip_disabled_reason = get_imgflip_state(request)
+
     context = {
         'templates': page_obj.object_list,
         'page_obj': page_obj,
@@ -176,6 +216,9 @@ def template_list(request):
         'per_page': per_page,
         'title': 'Template Bank',
         'page_type': 'template_list',
+        'imgflip_enabled': imgflip_enabled,
+        'imgflip_show_tab': imgflip_show_tab,
+        'imgflip_disabled_reason': imgflip_disabled_reason,
     }
     context.update(get_meme_maker_context())
     
@@ -250,6 +293,96 @@ def template_memes_partial(request, pk):
         'memes_sort': sort_key,
     }
     return render(request, get_template_candidates('meme_maker/partials/template_memes.html'), context)
+
+
+@require_GET
+def imgflip_search(request):
+    query = request.GET.get('q', '')
+    normalized = normalize_external_query(query)
+    imgflip_enabled, _, disabled_reason = get_imgflip_state(request)
+
+    if not normalized:
+        context = {
+            'imgflip_query': query,
+            'imgflip_memes': [],
+            'imgflip_empty': True,
+        }
+        return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
+
+    if not imgflip_enabled:
+        context = {
+            'imgflip_query': query,
+            'imgflip_disabled': True,
+            'imgflip_disabled_reason': disabled_reason,
+        }
+        return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
+
+    cache_days = meme_maker_settings.IMGFLIP_CACHE_DAYS or 30
+    try:
+        cache_days = int(cache_days)
+    except (TypeError, ValueError):
+        cache_days = 30
+
+    now = timezone.now()
+    cached = ExternalSourceQuery.objects.filter(
+        site_name=ExternalSourceQuery.SITE_IMGFLIP,
+        normalized_query=normalized,
+    ).first()
+
+    if cached and cached.fetched_at and now - cached.fetched_at <= timedelta(days=cache_days):
+        memes = extract_imgflip_memes(cached.result_json)
+        context = {
+            'imgflip_query': query,
+            'imgflip_memes': memes,
+            'imgflip_error': cached.error_message if cached.status == ExternalSourceQuery.STATUS_ERROR else None,
+        }
+        return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
+
+    payload = {
+        'username': meme_maker_settings.IMGFLIP_USERNAME,
+        'password': meme_maker_settings.IMGFLIP_PASSWORD,
+        'query': query,
+        'type': meme_maker_settings.IMGFLIP_DEFAULT_TYPE or 'image',
+        'include_nsfw': 1 if meme_maker_settings.IMGFLIP_INCLUDE_NSFW else 0,
+    }
+
+    result_json = {}
+    error_message = None
+    status = ExternalSourceQuery.STATUS_ERROR
+    try:
+        response = requests.post(
+            'https://api.imgflip.com/search_memes',
+            data=payload,
+            timeout=8,
+        )
+        result_json = response.json()
+        if result_json.get('success'):
+            status = ExternalSourceQuery.STATUS_SUCCESS
+        else:
+            error_message = result_json.get('error_message') or 'Imgflip search failed.'
+    except Exception:
+        result_json = {'success': False, 'error_message': 'Imgflip search failed.'}
+        error_message = result_json.get('error_message')
+
+    ExternalSourceQuery.objects.update_or_create(
+        site_name=ExternalSourceQuery.SITE_IMGFLIP,
+        normalized_query=normalized,
+        defaults={
+            'query_str': query,
+            'fetched_at': now,
+            'result_json': result_json,
+            'status': status,
+            'error_message': error_message or '',
+        }
+    )
+
+    memes = extract_imgflip_memes(result_json)
+    context = {
+        'imgflip_query': query,
+        'imgflip_memes': memes,
+        'imgflip_error': error_message,
+    }
+    return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
 
 
 def template_upload(request):
@@ -707,6 +840,10 @@ class MemeTemplateListView(ListView):
         context['per_page'] = self.get_paginate_by(self.get_queryset())
         if 'paginator' in context:
             context['total_count'] = context['paginator'].count
+        imgflip_enabled, imgflip_show_tab, imgflip_disabled_reason = get_imgflip_state(self.request)
+        context['imgflip_enabled'] = imgflip_enabled
+        context['imgflip_show_tab'] = imgflip_show_tab
+        context['imgflip_disabled_reason'] = imgflip_disabled_reason
         context.update(get_meme_maker_context())
         return context
 

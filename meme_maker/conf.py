@@ -51,6 +51,14 @@ MEME_MAKER = {
     # Optional template set name for themed frontends
     # If set, templates are loaded from meme_maker/<TEMPLATE_SET>/... with fallback
     'TEMPLATE_SET': None,
+
+    # Imgflip search integration (optional)
+    'IMGFLIP_USERNAME': None,
+    'IMGFLIP_PASSWORD': None,
+    'IMGFLIP_DEFAULT_TYPE': 'image',
+    'IMGFLIP_INCLUDE_NSFW': False,
+    'IMGFLIP_CACHE_DAYS': 30,
+    'ENABLE_IMGFLIP_SEARCH': False,
     
     # Custom font path for meme text rendering
     # If not set, uses system Impact font or bundled Anton font
@@ -89,6 +97,13 @@ class MemeMakerSettings:
         'WATERMARK_PADDING': 10,  # Pixels from edge
         'LINKED_OBJECT_RESOLVER': None,  # Callable or dotted path
         'TEMPLATE_SET': None,  # Template theme folder name
+        # Imgflip search integration (optional)
+        'IMGFLIP_USERNAME': None,
+        'IMGFLIP_PASSWORD': None,
+        'IMGFLIP_DEFAULT_TYPE': 'image',
+        'IMGFLIP_INCLUDE_NSFW': False,
+        'IMGFLIP_CACHE_DAYS': 30,
+        'ENABLE_IMGFLIP_SEARCH': False,
         'FONT_PATH': None,  # Custom font path for meme text
     }
     

@@ -5,6 +5,15 @@ All notable changes to django-meme-maker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] - 2026-01-22
+
+### Added
+- **Imgflip search integration**: Optional Imgflip tab with AJAX loading and DB caching
+- **ExternalSourceQuery cache model**: Stores external search results by normalized query
+
+### Changed
+- **Template search UI**: Added Imgflip tab and results panel on template list
+
 ## [1.3.7] - 2026-01-22
 
 ### Fixed

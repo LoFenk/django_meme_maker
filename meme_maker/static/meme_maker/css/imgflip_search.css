@@ -1,0 +1,75 @@
+.meme-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0 1.5rem;
+    flex-wrap: wrap;
+}
+
+.meme-tab {
+    border: 1px solid var(--meme-primary);
+    background: transparent;
+    color: var(--meme-primary);
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.meme-tab.is-active {
+    background: var(--meme-primary);
+    color: #fff;
+}
+
+.meme-tab.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.meme-tab-panels {
+    width: 100%;
+}
+
+.meme-tab-panel {
+    display: none;
+}
+
+.meme-tab-panel.is-active {
+    display: block;
+}
+
+.imgflip-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--meme-text-light);
+    margin-bottom: 1rem;
+}
+
+.imgflip-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--meme-primary);
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: imgflip-spin 0.8s linear infinite;
+}
+
+@keyframes imgflip-spin {
+    to { transform: rotate(360deg); }
+}
+
+.imgflip-empty {
+    text-align: center;
+    color: var(--meme-text-light);
+    padding: 2rem 1rem;
+}
+
+.imgflip-hint {
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+}
+
+.imgflip-card img {
+    object-fit: contain;
+}

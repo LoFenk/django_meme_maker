@@ -10,6 +10,7 @@ URL Structure:
     /templates/<pk>/rate/       → Rate a template (POST)
     /templates/<pk>/flag/       → Flag a template (POST)
     /templates/<pk>/memes/      → Template memes partial (GET)
+    /templates/imgflip/         → Imgflip search partial (GET)
     /editor/<template_pk>/      → Meme editor for a template
     /meme/<pk>/                 → View a meme
     /meme/<pk>/download/        → Download meme image
@@ -35,6 +36,7 @@ urlpatterns = [
     path('templates/<int:pk>/rate/', views.rate_template, name='rate_template'),
     path('templates/<int:pk>/flag/', views.flag_template, name='flag_template'),
     path('templates/<int:pk>/memes/', views.template_memes_partial, name='template_memes_partial'),
+    path('templates/imgflip/', views.imgflip_search, name='imgflip_search'),
     
     # Meme Editor
     path('editor/<int:template_pk>/', views.meme_editor, name='meme_editor'),

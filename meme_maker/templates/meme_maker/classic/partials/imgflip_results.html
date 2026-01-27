@@ -1,0 +1,37 @@
+{% if imgflip_empty %}
+<div class="imgflip-empty">
+    <p>Enter a search term to load Imgflip results.</p>
+</div>
+{% elif imgflip_disabled %}
+<div class="imgflip-empty">
+    <p>Imgflip search unavailable.</p>
+    {% if imgflip_disabled_reason %}
+    <p class="imgflip-hint">{{ imgflip_disabled_reason }}</p>
+    {% endif %}
+</div>
+{% elif imgflip_error %}
+<div class="imgflip-empty">
+    <p>Imgflip search failed.</p>
+    <p class="imgflip-hint">{{ imgflip_error }}</p>
+</div>
+{% elif imgflip_memes %}
+<div class="meme-grid">
+    {% for meme in imgflip_memes %}
+    <div class="meme-card-wrapper">
+        <div class="meme-card imgflip-card">
+            <img src="{{ meme.url }}" alt="{{ meme.name }}" class="meme-card-image">
+            <div class="meme-card-body">
+                <h3 class="meme-card-title">{{ meme.name }}</h3>
+                <p class="meme-card-text">Size: {{ meme.width }} × {{ meme.height }}</p>
+                <p class="meme-card-text">Text boxes: {{ meme.box_count }}</p>
+                <p class="meme-card-meta">Captions: {{ meme.captions }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="imgflip-empty">
+    <p>No results found on Imgflip.</p>
+</div>
+{% endif %}

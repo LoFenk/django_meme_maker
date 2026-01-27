@@ -12,16 +12,19 @@ import json
 import tempfile
 from io import BytesIO
 from PIL import Image
+from unittest.mock import patch
+from datetime import timedelta
 
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.files.base import ContentFile
+from django.utils import timezone
 
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 
-from .models import MemeTemplate, Meme, TemplateLink, MemeLink, TemplateFlag, MemeFlag
+from .models import MemeTemplate, Meme, TemplateLink, MemeLink, TemplateFlag, MemeFlag, ExternalSourceQuery
 from .forms import MemeTemplateForm, MemeEditorForm, MemeTemplateSearchForm
 
 
@@ -1833,3 +1836,136 @@ class LinkCascadeDeleteTests(TestCase):
         self.meme.delete()
         
         self.assertEqual(MemeLink.objects.count(), 0)
+
+
+# =============================================================================
+# IMGFLIP SEARCH TESTS
+# =============================================================================
+
+class ImgflipSearchTests(TestCase):
+    def setUp(self):
+        from .conf import meme_maker_settings
+        meme_maker_settings._cached_settings = None
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_disabled_returns_unavailable(self, mock_post):
+        with override_settings(MEME_MAKER={'ENABLE_IMGFLIP_SEARCH': False}):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': 'drake'})
+            self.assertContains(response, 'Imgflip search unavailable')
+            mock_post.assert_not_called()
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_cache_hit_skips_external_call(self, mock_post):
+        with override_settings(MEME_MAKER={
+            'ENABLE_IMGFLIP_SEARCH': True,
+            'IMGFLIP_USERNAME': 'user',
+            'IMGFLIP_PASSWORD': 'pass',
+            'IMGFLIP_CACHE_DAYS': 30,
+        }):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+            ExternalSourceQuery.objects.create(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                query_str='drake',
+                normalized_query='drake',
+                fetched_at=timezone.now(),
+                status=ExternalSourceQuery.STATUS_SUCCESS,
+                result_json={
+                    'success': True,
+                    'data': {
+                        'memes': [
+                            {
+                                'id': '1',
+                                'name': 'Drake Hotline Bling',
+                                'url': 'https://example.com/drake.jpg',
+                                'width': 500,
+                                'height': 500,
+                                'box_count': 2,
+                                'captions': 123,
+                            }
+                        ]
+                    }
+                }
+            )
+
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': 'drake'})
+            self.assertContains(response, 'Drake Hotline Bling')
+            mock_post.assert_not_called()
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_cache_miss_calls_external(self, mock_post):
+        with override_settings(MEME_MAKER={
+            'ENABLE_IMGFLIP_SEARCH': True,
+            'IMGFLIP_USERNAME': 'user',
+            'IMGFLIP_PASSWORD': 'pass',
+            'IMGFLIP_CACHE_DAYS': 30,
+        }):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+            ExternalSourceQuery.objects.create(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                query_str='drake',
+                normalized_query='drake',
+                fetched_at=timezone.now() - timedelta(days=40),
+                status=ExternalSourceQuery.STATUS_ERROR,
+                result_json={'success': False, 'error_message': 'stale'}
+            )
+
+            class DummyResponse:
+                def json(self):
+                    return {
+                        'success': True,
+                        'data': {
+                            'memes': [
+                                {
+                                    'id': '2',
+                                    'name': 'New Meme',
+                                    'url': 'https://example.com/new.jpg',
+                                    'width': 400,
+                                    'height': 300,
+                                    'box_count': 2,
+                                    'captions': 10,
+                                }
+                            ]
+                        }
+                    }
+
+            mock_post.return_value = DummyResponse()
+
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': 'drake'})
+            self.assertContains(response, 'New Meme')
+            self.assertTrue(mock_post.called)
+
+            cached = ExternalSourceQuery.objects.get(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                normalized_query='drake',
+            )
+            self.assertEqual(cached.status, ExternalSourceQuery.STATUS_SUCCESS)
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_api_error_cached(self, mock_post):
+        with override_settings(MEME_MAKER={
+            'ENABLE_IMGFLIP_SEARCH': True,
+            'IMGFLIP_USERNAME': 'user',
+            'IMGFLIP_PASSWORD': 'pass',
+            'IMGFLIP_CACHE_DAYS': 30,
+        }):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+            class DummyResponse:
+                def json(self):
+                    return {'success': False, 'error_message': 'Imgflip error'}
+
+            mock_post.return_value = DummyResponse()
+
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': 'drake'})
+            self.assertContains(response, 'Imgflip search failed')
+            self.assertContains(response, 'Imgflip error')
+
+            cached = ExternalSourceQuery.objects.get(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                normalized_query='drake',
+            )
+            self.assertEqual(cached.status, ExternalSourceQuery.STATUS_ERROR)

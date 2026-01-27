@@ -6,7 +6,7 @@ Provides admin interfaces for MemeTemplate, Meme, and Link models.
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import MemeTemplate, Meme, TemplateLink, MemeLink, TemplateFlag, MemeFlag
+from .models import MemeTemplate, Meme, TemplateLink, MemeLink, TemplateFlag, MemeFlag, ExternalSourceQuery
 
 
 @admin.register(MemeTemplate)
@@ -203,6 +203,29 @@ class MemeLinkInline(admin.TabularInline):
     
     def has_add_permission(self, request, obj=None):
         return False  # Links should be created programmatically
+
+
+@admin.register(ExternalSourceQuery)
+class ExternalSourceQueryAdmin(admin.ModelAdmin):
+    """Admin interface for external search cache entries."""
+    list_display = ['site_name', 'normalized_query', 'status', 'fetched_at', 'updated_at']
+    list_filter = ['site_name', 'status', 'fetched_at']
+    search_fields = ['query_str', 'normalized_query']
+    readonly_fields = ['site_name', 'query_str', 'normalized_query', 'fetched_at', 'status', 'error_message', 'result_json', 'created_at', 'updated_at']
+
+    fieldsets = (
+        (None, {
+            'fields': ('site_name', 'query_str', 'normalized_query', 'status', 'error_message')
+        }),
+        ('Result', {
+            'fields': ('result_json',),
+            'classes': ('collapse',),
+        }),
+        ('Timestamps', {
+            'fields': ('fetched_at', 'created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
 
 
 @admin.register(TemplateLink)
