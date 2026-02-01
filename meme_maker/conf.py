@@ -57,7 +57,10 @@ MEME_MAKER = {
     'IMGFLIP_PASSWORD': None,
     'IMGFLIP_DEFAULT_TYPE': 'image',
     'IMGFLIP_INCLUDE_NSFW': False,
+    # Cache successful responses for this many days (set to 0 to disable caching)
     'IMGFLIP_CACHE_DAYS': 30,
+    # Cache error responses for this many minutes (set to 0 to disable error caching)
+    'IMGFLIP_ERROR_CACHE_MINUTES': 30,
     'ENABLE_IMGFLIP_SEARCH': False,
     
     # Custom font path for meme text rendering
@@ -103,6 +106,7 @@ class MemeMakerSettings:
         'IMGFLIP_DEFAULT_TYPE': 'image',
         'IMGFLIP_INCLUDE_NSFW': False,
         'IMGFLIP_CACHE_DAYS': 30,
+        'IMGFLIP_ERROR_CACHE_MINUTES': 30,
         'ENABLE_IMGFLIP_SEARCH': False,
         'FONT_PATH': None,  # Custom font path for meme text
     }

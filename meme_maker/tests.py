@@ -1866,10 +1866,14 @@ class ImgflipSearchTests(TestCase):
         }):
             from .conf import meme_maker_settings
             meme_maker_settings._cached_settings = None
+            from .views import build_imgflip_cache_key, normalize_external_query
+            normalized = normalize_external_query('drake')
+            max_len = ExternalSourceQuery._meta.get_field('normalized_query').max_length
+            cache_key = build_imgflip_cache_key(normalized, 'image', False, max_len)
             ExternalSourceQuery.objects.create(
                 site_name=ExternalSourceQuery.SITE_IMGFLIP,
                 query_str='drake',
-                normalized_query='drake',
+                normalized_query=cache_key,
                 fetched_at=timezone.now(),
                 status=ExternalSourceQuery.STATUS_SUCCESS,
                 result_json={
@@ -1904,10 +1908,14 @@ class ImgflipSearchTests(TestCase):
         }):
             from .conf import meme_maker_settings
             meme_maker_settings._cached_settings = None
+            from .views import build_imgflip_cache_key, normalize_external_query
+            normalized = normalize_external_query('drake')
+            max_len = ExternalSourceQuery._meta.get_field('normalized_query').max_length
+            cache_key = build_imgflip_cache_key(normalized, 'image', False, max_len)
             ExternalSourceQuery.objects.create(
                 site_name=ExternalSourceQuery.SITE_IMGFLIP,
                 query_str='drake',
-                normalized_query='drake',
+                normalized_query=cache_key,
                 fetched_at=timezone.now() - timedelta(days=40),
                 status=ExternalSourceQuery.STATUS_ERROR,
                 result_json={'success': False, 'error_message': 'stale'}
@@ -1940,7 +1948,7 @@ class ImgflipSearchTests(TestCase):
 
             cached = ExternalSourceQuery.objects.get(
                 site_name=ExternalSourceQuery.SITE_IMGFLIP,
-                normalized_query='drake',
+                normalized_query=cache_key,
             )
             self.assertEqual(cached.status, ExternalSourceQuery.STATUS_SUCCESS)
 
@@ -1951,9 +1959,14 @@ class ImgflipSearchTests(TestCase):
             'IMGFLIP_USERNAME': 'user',
             'IMGFLIP_PASSWORD': 'pass',
             'IMGFLIP_CACHE_DAYS': 30,
+            'IMGFLIP_ERROR_CACHE_MINUTES': 30,
         }):
             from .conf import meme_maker_settings
             meme_maker_settings._cached_settings = None
+            from .views import build_imgflip_cache_key, normalize_external_query
+            normalized = normalize_external_query('drake')
+            max_len = ExternalSourceQuery._meta.get_field('normalized_query').max_length
+            cache_key = build_imgflip_cache_key(normalized, 'image', False, max_len)
             class DummyResponse:
                 def json(self):
                     return {'success': False, 'error_message': 'Imgflip error'}
@@ -1966,6 +1979,155 @@ class ImgflipSearchTests(TestCase):
 
             cached = ExternalSourceQuery.objects.get(
                 site_name=ExternalSourceQuery.SITE_IMGFLIP,
-                normalized_query='drake',
+                normalized_query=cache_key,
             )
             self.assertEqual(cached.status, ExternalSourceQuery.STATUS_ERROR)
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_long_query_truncates_cache_fields(self, mock_post):
+        with override_settings(MEME_MAKER={
+            'ENABLE_IMGFLIP_SEARCH': True,
+            'IMGFLIP_USERNAME': 'user',
+            'IMGFLIP_PASSWORD': 'pass',
+            'IMGFLIP_CACHE_DAYS': 30,
+        }):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+
+            class DummyResponse:
+                def json(self):
+                    return {
+                        'success': True,
+                        'data': {
+                            'memes': [
+                                {
+                                    'id': '1',
+                                    'name': 'New Meme',
+                                    'url': 'https://example.com/new.jpg',
+                                    'width': 400,
+                                    'height': 300,
+                                    'box_count': 2,
+                                    'captions': 10,
+                                }
+                            ]
+                        }
+                    }
+
+            mock_post.return_value = DummyResponse()
+
+            long_query = 'a' * 500
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': long_query})
+            self.assertContains(response, 'New Meme')
+
+            cached = ExternalSourceQuery.objects.get(site_name=ExternalSourceQuery.SITE_IMGFLIP)
+            self.assertLessEqual(len(cached.query_str), 300)
+            self.assertLessEqual(len(cached.normalized_query), 300)
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_cache_disabled_skips_cache(self, mock_post):
+        with override_settings(MEME_MAKER={
+            'ENABLE_IMGFLIP_SEARCH': True,
+            'IMGFLIP_USERNAME': 'user',
+            'IMGFLIP_PASSWORD': 'pass',
+            'IMGFLIP_CACHE_DAYS': 0,
+        }):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+            from .views import build_imgflip_cache_key, normalize_external_query
+
+            normalized = normalize_external_query('drake')
+            max_len = ExternalSourceQuery._meta.get_field('normalized_query').max_length
+            cache_key = build_imgflip_cache_key(normalized, 'image', False, max_len)
+            cached = ExternalSourceQuery.objects.create(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                query_str='drake',
+                normalized_query=cache_key,
+                fetched_at=timezone.now(),
+                status=ExternalSourceQuery.STATUS_SUCCESS,
+                result_json={'success': True, 'data': {'memes': []}},
+            )
+            cached_fetched_at = cached.fetched_at
+
+            class DummyResponse:
+                def json(self):
+                    return {
+                        'success': True,
+                        'data': {
+                            'memes': [
+                                {
+                                    'id': '2',
+                                    'name': 'New Meme',
+                                    'url': 'https://example.com/new.jpg',
+                                    'width': 400,
+                                    'height': 300,
+                                    'box_count': 2,
+                                    'captions': 10,
+                                }
+                            ]
+                        }
+                    }
+
+            mock_post.return_value = DummyResponse()
+
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': 'drake'})
+            self.assertContains(response, 'New Meme')
+            self.assertTrue(mock_post.called)
+
+            cached.refresh_from_db()
+            self.assertEqual(cached.fetched_at, cached_fetched_at)
+            self.assertEqual(ExternalSourceQuery.objects.count(), 1)
+
+    @patch('meme_maker.views.requests.post')
+    def test_imgflip_error_cache_ttl_respected(self, mock_post):
+        with override_settings(MEME_MAKER={
+            'ENABLE_IMGFLIP_SEARCH': True,
+            'IMGFLIP_USERNAME': 'user',
+            'IMGFLIP_PASSWORD': 'pass',
+            'IMGFLIP_CACHE_DAYS': 30,
+            'IMGFLIP_ERROR_CACHE_MINUTES': 1,
+        }):
+            from .conf import meme_maker_settings
+            meme_maker_settings._cached_settings = None
+            from .views import build_imgflip_cache_key, normalize_external_query
+
+            normalized = normalize_external_query('drake')
+            max_len = ExternalSourceQuery._meta.get_field('normalized_query').max_length
+            cache_key = build_imgflip_cache_key(normalized, 'image', False, max_len)
+            ExternalSourceQuery.objects.create(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                query_str='drake',
+                normalized_query=cache_key,
+                fetched_at=timezone.now() - timedelta(minutes=2),
+                status=ExternalSourceQuery.STATUS_ERROR,
+                error_message='Imgflip error',
+                result_json={'success': False, 'error_message': 'Imgflip error'},
+            )
+
+            class DummyResponse:
+                def json(self):
+                    return {
+                        'success': True,
+                        'data': {
+                            'memes': [
+                                {
+                                    'id': '3',
+                                    'name': 'New Meme',
+                                    'url': 'https://example.com/new.jpg',
+                                    'width': 400,
+                                    'height': 300,
+                                    'box_count': 2,
+                                    'captions': 10,
+                                }
+                            ]
+                        }
+                    }
+
+            mock_post.return_value = DummyResponse()
+
+            response = self.client.get(reverse('meme_maker:imgflip_search'), {'q': 'drake'})
+            self.assertContains(response, 'New Meme')
+            cached = ExternalSourceQuery.objects.get(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                normalized_query=cache_key,
+            )
+            self.assertEqual(cached.status, ExternalSourceQuery.STATUS_SUCCESS)

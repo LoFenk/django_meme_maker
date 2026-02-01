@@ -11,6 +11,7 @@ Provides views for:
 import json
 import mimetypes
 import re
+import hashlib
 from datetime import timedelta
 import requests
 from django.shortcuts import render, redirect, get_object_or_404
@@ -24,6 +25,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db import IntegrityError
 
 from .models import Meme, MemeTemplate, TemplateRating, MemeRating, MemeFlag, TemplateFlag, ExternalSourceQuery
 from .forms import MemeTemplateForm, MemeTemplateSearchForm, MemeEditorForm
@@ -83,6 +85,23 @@ def normalize_external_query(query):
     """Normalize external search query for caching."""
     normalized = re.sub(r'\s+', ' ', (query or '')).strip().lower()
     return normalized
+
+
+def truncate_query_value(value, max_len):
+    value = value or ''
+    if len(value) <= max_len:
+        return value
+    return value[:max_len]
+
+
+def build_imgflip_cache_key(normalized_query, imgflip_type, include_nsfw, max_len):
+    type_key = str(imgflip_type or 'image').strip().lower() or 'image'
+    nsfw_key = '1' if include_nsfw else '0'
+    key = f"{normalized_query}|type:{type_key}|nsfw:{nsfw_key}"
+    if len(key) <= max_len:
+        return key
+    digest = hashlib.sha256(key.encode('utf-8')).hexdigest()
+    return f"sha256:{digest}"
 
 
 def get_imgflip_state(request):
@@ -317,33 +336,67 @@ def imgflip_search(request):
         }
         return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
 
-    cache_days = meme_maker_settings.IMGFLIP_CACHE_DAYS or 30
-    try:
-        cache_days = int(cache_days)
-    except (TypeError, ValueError):
+    imgflip_type = str(meme_maker_settings.IMGFLIP_DEFAULT_TYPE or 'image').strip() or 'image'
+    include_nsfw = bool(meme_maker_settings.IMGFLIP_INCLUDE_NSFW)
+
+    cache_days_setting = meme_maker_settings.IMGFLIP_CACHE_DAYS
+    if cache_days_setting is None:
         cache_days = 30
+    else:
+        try:
+            cache_days = int(cache_days_setting)
+        except (TypeError, ValueError):
+            cache_days = 30
+    cache_enabled = cache_days > 0
+
+    error_cache_setting = meme_maker_settings.IMGFLIP_ERROR_CACHE_MINUTES
+    if error_cache_setting is None:
+        error_cache_minutes = 30
+    else:
+        try:
+            error_cache_minutes = int(error_cache_setting)
+        except (TypeError, ValueError):
+            error_cache_minutes = 30
+    error_cache_ttl = timedelta(minutes=error_cache_minutes) if error_cache_minutes > 0 else None
+
+    normalized_max_len = ExternalSourceQuery._meta.get_field('normalized_query').max_length
+    query_max_len = ExternalSourceQuery._meta.get_field('query_str').max_length
+    cache_key = build_imgflip_cache_key(normalized, imgflip_type, include_nsfw, normalized_max_len)
+    query_str = truncate_query_value(query, query_max_len)
 
     now = timezone.now()
-    cached = ExternalSourceQuery.objects.filter(
-        site_name=ExternalSourceQuery.SITE_IMGFLIP,
-        normalized_query=normalized,
-    ).first()
+    cached = None
+    if cache_enabled:
+        cached = ExternalSourceQuery.objects.filter(
+            site_name=ExternalSourceQuery.SITE_IMGFLIP,
+            normalized_query=cache_key,
+        ).first()
 
-    if cached and cached.fetched_at and now - cached.fetched_at <= timedelta(days=cache_days):
-        memes = extract_imgflip_memes(cached.result_json)
-        context = {
-            'imgflip_query': query,
-            'imgflip_memes': memes,
-            'imgflip_error': cached.error_message if cached.status == ExternalSourceQuery.STATUS_ERROR else None,
-        }
-        return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
+    if cached and cached.fetched_at:
+        if cached.status == ExternalSourceQuery.STATUS_ERROR:
+            if error_cache_ttl and now - cached.fetched_at <= error_cache_ttl:
+                memes = extract_imgflip_memes(cached.result_json)
+                context = {
+                    'imgflip_query': query,
+                    'imgflip_memes': memes,
+                    'imgflip_error': cached.error_message,
+                }
+                return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
+        elif now - cached.fetched_at <= timedelta(days=cache_days):
+            memes = extract_imgflip_memes(cached.result_json)
+            context = {
+                'imgflip_query': query,
+                'imgflip_memes': memes,
+                'imgflip_error': None,
+            }
+            return render(request, get_template_candidates('meme_maker/partials/imgflip_results.html'), context)
 
     payload = {
         'username': meme_maker_settings.IMGFLIP_USERNAME,
         'password': meme_maker_settings.IMGFLIP_PASSWORD,
         'query': query,
-        'type': meme_maker_settings.IMGFLIP_DEFAULT_TYPE or 'image',
-        'include_nsfw': 1 if meme_maker_settings.IMGFLIP_INCLUDE_NSFW else 0,
+        'type': imgflip_type,
+        'include_nsfw': 1 if include_nsfw else 0,
     }
 
     result_json = {}
@@ -364,17 +417,30 @@ def imgflip_search(request):
         result_json = {'success': False, 'error_message': 'Imgflip search failed.'}
         error_message = result_json.get('error_message')
 
-    ExternalSourceQuery.objects.update_or_create(
-        site_name=ExternalSourceQuery.SITE_IMGFLIP,
-        normalized_query=normalized,
-        defaults={
-            'query_str': query,
-            'fetched_at': now,
-            'result_json': result_json,
-            'status': status,
-            'error_message': error_message or '',
-        }
-    )
+    if cache_enabled:
+        try:
+            ExternalSourceQuery.objects.update_or_create(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                normalized_query=cache_key,
+                defaults={
+                    'query_str': query_str,
+                    'fetched_at': now,
+                    'result_json': result_json,
+                    'status': status,
+                    'error_message': error_message or '',
+                }
+            )
+        except IntegrityError:
+            ExternalSourceQuery.objects.filter(
+                site_name=ExternalSourceQuery.SITE_IMGFLIP,
+                normalized_query=cache_key,
+            ).update(
+                query_str=query_str,
+                fetched_at=now,
+                result_json=result_json,
+                status=status,
+                error_message=error_message or '',
+            )
 
     memes = extract_imgflip_memes(result_json)
     context = {
